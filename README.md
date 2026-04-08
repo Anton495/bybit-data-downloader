@@ -23,7 +23,7 @@ Csv.gz files are never written to disk — everything happens in RAM.
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.1+
 - `pip install polars requests tqdm`
 
 ## Configuration
