@@ -94,11 +94,11 @@ Spot data on the server has two file naming patterns: daily (`SYMBOL_YYYY-MM-DD.
 Each symbol has a manifest file (`{symbol}_manifest.txt`):
 
 ```
-filename                             size      [status]
-{symbol}_2019-10-01.csv.gz           0         pending (no status)
-{symbol}_2024-01-15.csv.gz           52480     true
-{symbol}_2024-01-16.csv.gz           48192     false
-{symbol}-2022-11.csv.gz              0         skip
+filename                       size      [status]
+{symbol}_2019-10-01.csv.gz     0         pending (no status)
+{symbol}_2024-01-15.csv.gz     52480     true
+{symbol}_2024-01-16.csv.gz     48192     false
+{symbol}-2022-11.csv.gz        0         skip
 ```
 
 | Status | Meaning |
