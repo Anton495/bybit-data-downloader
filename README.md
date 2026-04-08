@@ -46,10 +46,20 @@ Set `SPECIFIC_SYMBOLS` in the script and run.
 
 ### Command line
 
+## Command line — Futuries
+
 ```bash
 bybit_futures_trades.py --symbols ETHUSDT SOLUSDT
 bybit_futures_trades.py --symbols BTCUSDT --workers 3
 bybit_futures_trades.py --all
+```
+
+## Command line — Spot
+
+```bash
+bybit_spot_trades.py --symbols ETHUSDT SOLUSDT
+bybit_spot_trades.py --symbols BTCUSDT --workers 3
+bybit_spot_trades.py --all
 ```
 
 ## Output structure
