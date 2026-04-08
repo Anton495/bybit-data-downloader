@@ -95,9 +95,10 @@ Each symbol has a manifest file (`{symbol}_manifest.txt`):
 
 ```
 filename                    size  [status]
-2019-10-01.csv.gz           0     pending (no status)
-2024-01-15.csv.gz           52480 true
-2024-01-16.csv.gz           48192 false
+{symbol}_2019-10-01.csv.gz           0     pending (no status)
+{symbol}_2024-01-15.csv.gz           52480 true
+{symbol}_2024-01-16.csv.gz           48192 false
+{symbol}-2022-11.csv.gz              0     skip
 ```
 
 | Status | Meaning |
@@ -105,6 +106,7 @@ filename                    size  [status]
 | *(no status)* | File not yet processed |
 | `true` | Parquet successfully created |
 | `false` | Error (download / gzip / conversion). Retried on next run |
+| `skip` | Excluded from download (monthly aggregation, duplicates daily data) |
 
 File size in manifest equals `len(resp.content)` — the actual number of downloaded bytes. No HEAD requests are made at any stage. Integrity is verified by `gzip.decompress()` (CRC32 + deflate).
 
