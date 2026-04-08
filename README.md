@@ -47,9 +47,9 @@ Set `SPECIFIC_SYMBOLS` in the script and run.
 ### Command line
 
 ```bash
-python bybit_downloader_raw_new.py --symbols ETHUSDT SOLUSDT
-python bybit_downloader_raw_new.py --symbols BTCUSDT --workers 3
-python bybit_downloader_raw_new.py --all
+bybit_futures_trades.py --symbols ETHUSDT SOLUSDT
+bybit_futures_trades.py --symbols BTCUSDT --workers 3
+bybit_futures_trades.py --all
 ```
 
 ## Output structure
