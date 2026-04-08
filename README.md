@@ -2,7 +2,14 @@
 
 Downloads historical trade data from [public.bybit.com](https://public.bybit.com) and converts it to Parquet format.
 
-Data source: [public.bybit.com](https://public.bybit.com) — daily CSV files with all trades for USDT spot and perpetual futures. Described on the [Bybit website](https://www.bybit.com/derivatives/en/history-data) as Public Trading History.
+Data source: [public.bybit.com](https://public.bybit.com) — daily CSV files with all trades for spot and perpetual futures. Described on the [Bybit website](https://www.bybit.com/derivatives/en/history-data) as Public Trading History.
+
+Two separate scripts:
+
+| Script | Data type | Source |
+|--------|-----------|--------|
+| bybit_futures_trades.py | USDT perpetual futures trades | [public.bybit.com/trading](https://public.bybit.com/trading) |
+| bybit_spot_trades.py | USDT spot trades | [public.bybit.com/spot](https://public.bybit.com/spot) |
 
 > **Disclaimer**: This tool is not affiliated with, endorsed by, or connected to Bybit in any way. Data is sourced from publicly available Bybit servers. Use at your own risk. The author assumes no responsibility for any issues arising from the use of this software, including but not limited to data accuracy, availability, or compliance with local regulations, and under no circumstances shall be responsible or liable for any claims, damages, losses, expenses, costs, or liabilities of any kind, including direct or indirect damages for loss of profits.
 
