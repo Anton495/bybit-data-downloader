@@ -87,7 +87,7 @@ Each .data.zip contains a single .data file in JSONL format — one JSON object 
 ### File naming
 
 ```
-2025-04-29_BTCUSDT_ob200.data.zip      →  2025-04-29_BTCUSDT_ob200.parquet
+2025-04-29_BTCUSDT_ob200.data.zip   →   2025-04-29_BTCUSDT_ob200.parquet
 ```
 
 Format: `YYYY-MM-DD_SYMBOL_ob{depth}.data.zip` where depth is 200 or 500.
