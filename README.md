@@ -1,6 +1,6 @@
 # Bybit Historical Data Downloader
 
-Downloads historical trade and orderbook data from Bybit public servers and converts it to Parquet format.
+Downloads historical trades and orderbook data from Bybit public servers and converts it to Parquet format.
 
 Two data sources, four separate scripts:
 
