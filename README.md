@@ -53,7 +53,7 @@ Set `SPECIFIC_SYMBOLS` in the script and run.
 
 ### Command line
 
-## Command line — Futures
+## Command line — futures trades
 
 ```bash
 bybit_futures_trades.py --symbols ETHUSDT SOLUSDT
@@ -61,7 +61,7 @@ bybit_futures_trades.py --symbols BTCUSDT --workers 3
 bybit_futures_trades.py --all
 ```
 
-## Command line — Spot
+## Command line — spot trades
 
 ```bash
 bybit_spot_trades.py --symbols ETHUSDT SOLUSDT
