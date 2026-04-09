@@ -53,7 +53,7 @@ Set `SPECIFIC_SYMBOLS` in the script and run.
 
 ### Command line
 
-## Command line — Futuries
+## Command line — Futures
 
 ```bash
 bybit_futures_trades.py --symbols ETHUSDT SOLUSDT
