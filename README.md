@@ -70,7 +70,7 @@ Spot data on the server has two file naming patterns: daily (`SYMBOL_YYYY-MM-DD.
 
 ## Orderbook scripts
 
-Data source: [quote-saver.bycsi.com](https://quote-saver.bycsi.com) — daily .data.zip files containing orderbook snapshots and incremental deltas in JSONL format. Described on the Bybit website as OrderBook.
+Data source: [quote-saver.bycsi.com](https://quote-saver.bycsi.com) — daily .data.zip files containing orderbook snapshots and incremental deltas in JSONL format. Described on the [Bybit website](https://www.bybit.com/derivatives/en/history-data) as OrderBook.
 
 ### Pipeline
 
