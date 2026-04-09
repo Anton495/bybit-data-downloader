@@ -100,9 +100,6 @@ Set at the top of the script:
 SPECIFIC_SYMBOLS = ["ETHUSDT", "BTCUSDT"]     # None = all USDT pairs
 CONCURRENT_WORKERS = 3                        # parallel download threads
 DOWNLOAD_TIMEOUT = 600                        # seconds (files are large, up to ~300 MB)
-CONNECT_TIMEOUT = 15                          # connect timeout (seconds)
-MAX_RETRIES = 3                               # retry attempts on failure
-RETRY_DELAY = 5                               # seconds between retries
 SYMBOL_DELAY = 2.0                            # pause between symbols
 PROXY_URL = False                             # e.g. "http://127.0.0.1:2080" or False
 ```
