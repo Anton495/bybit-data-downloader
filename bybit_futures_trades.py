@@ -44,7 +44,7 @@ TRADING_PATH = "/trading/"
 OUTPUT_DIR = "bybit_data/futures/trades"
 # If None — all USDT perpetual futures are downloaded
 # If a list — only the specified symbols
-SPECIFIC_SYMBOLS: Optional[List[str]] = ['EDGEUSDT']  # None = all; ["ETHUSDT"] = specific
+SPECIFIC_SYMBOLS: Optional[List[str]] = None  # None = all; ["ETHUSDT"] = specific
 DOWNLOAD_TIMEOUT = 120          # read timeout per file (seconds)
 CONNECT_TIMEOUT = 15           # connect timeout (seconds)
 MAX_RETRIES = 3
