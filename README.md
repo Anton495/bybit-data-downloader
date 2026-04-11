@@ -281,13 +281,13 @@ Groups are mutually exclusive — each symbol matches at most one group. Symbol 
 The script `bybit_verify_groups.py` verifies symbol group classification for all 4 downloaders against live server data. It reads regex patterns directly from the script files (no changes to the downloaders are required) and reports matched, unmatched, and overlapping symbols.
 
 ```bash
-python bybit_verify_groups.py                                  # all 4 scripts
-python bybit_verify_groups.py --trades                         # futures_trades + spot_trades
-python bybit_verify_groups.py --orderbook                      # futures_orderbook + spot_orderbook
-python bybit_verify_groups.py --full                           # print all symbols per group
-python bybit_verify_groups.py --group USDT                     # show USDT group across selected scripts
-python bybit_verify_groups.py --group DAI                      # show DAI group across selected scripts
-python bybit_verify_groups.py --trades --group CRYPTO          # CRYPTO group in trades scripts only
+python bybit_verify_groups.py                                # all 4 scripts
+python bybit_verify_groups.py --trades                       # futures_trades + spot_trades
+python bybit_verify_groups.py --orderbook                    # futures_orderbook + spot_orderbook
+python bybit_verify_groups.py --full                         # print all symbols per group
+python bybit_verify_groups.py --group USDT                   # show USDT group across selected scripts
+python bybit_verify_groups.py --group DAI                    # show DAI group across selected scripts
+python bybit_verify_groups.py --trades --group CRYPTO        # CRYPTO group in trades scripts only
 python bybit_verify_groups.py --orderbook --group LEVERAGED
 ```
 
