@@ -116,12 +116,12 @@ Format: `YYYY-MM-DD_SYMBOL_ob{depth}.data.zip` where depth is 200 or 500.
 Set at the top of the script:
 
 ```python
-SPECIFIC_SYMBOLS = None                       # None = use DEFAULT_GROUP; ["ETHUSDT"] = specific symbols
-DEFAULT_GROUP = "USDT"                        # group for Spyder mode (see Symbol groups)
-CONCURRENT_WORKERS = 3                        # parallel download threads
-DOWNLOAD_TIMEOUT = 600                        # seconds (files are large)
-SYMBOL_DELAY = 2.0                            # pause between symbols
-PROXY_URL = False                             # e.g. "http://127.0.0.1:2080" or False
+SPECIFIC_SYMBOLS = None                     # None = use DEFAULT_GROUP; ["ETHUSDT"] = specific symbols
+DEFAULT_GROUP = "USDT"                      # group for Spyder mode (see Symbol groups)
+CONCURRENT_WORKERS = 3                      # parallel download threads
+DOWNLOAD_TIMEOUT = 600                      # seconds (files are large)
+SYMBOL_DELAY = 2.0                          # pause between symbols
+PROXY_URL = False                           # e.g. "http://127.0.0.1:2080" or False
 ```
 
 #### Parquet compression
