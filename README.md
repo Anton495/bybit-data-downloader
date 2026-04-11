@@ -1,15 +1,15 @@
 # Bybit Historical Data Downloader
 
-Downloads historical trades and orderbook data from Bybit public servers and converts it to Parquet format.
+Downloads historical trade and orderbook data from Bybit public servers and converts it to Parquet format.
 
 Two data sources, four separate scripts:
 
 | Script | Data type | Source |
 |--------|-----------|--------|
-| bybit_futures_trades.py | USDT perpetual futures trades | [public.bybit.com/trading](https://public.bybit.com/trading) |
-| bybit_spot_trades.py | USDT spot trades | [public.bybit.com/spot](https://public.bybit.com/spot) |
-| bybit_futures_orderbook.py | USDT perpetual futures orderbook | [quote-saver.bycsi.com/orderbook/linear](https://quote-saver.bycsi.com/orderbook/linear) |
-| bybit_spot_orderbook.py | USDT spot orderbook | [quote-saver.bycsi.com/orderbook/spot](https://quote-saver.bycsi.com/orderbook/spot) |
+| bybit_futures_trades.py | Futures trades | [public.bybit.com/trading](https://public.bybit.com/trading) |
+| bybit_spot_trades.py | Spot trades | [public.bybit.com/spot](https://public.bybit.com/spot) |
+| bybit_futures_orderbook.py | Futures orderbook  | [quote-saver.bycsi.com/orderbook/linear](https://quote-saver.bycsi.com/orderbook/linear) |
+| bybit_spot_orderbook.py | Spot orderbook | [quote-saver.bycsi.com/orderbook/spot](https://quote-saver.bycsi.com/orderbook/spot) |
 
 > **Disclaimer**: This tool is not affiliated with, endorsed by, or connected to Bybit in any way. Data is sourced from publicly available Bybit servers. Use at your own risk. The author assumes no responsibility for any issues arising from the use of this software, including but not limited to data accuracy, availability, or compliance with local regulations, and under no circumstances shall be responsible or liable for any claims, damages, losses, expenses, costs, or liabilities of any kind, including direct or indirect damages for loss of profits.
 
@@ -32,11 +32,14 @@ Csv.gz files are never written to disk — everything happens in RAM.
 Set at the top of the script:
 
 ```python
-SPECIFIC_SYMBOLS = ["ETHUSDT", "BTCUSDT"]     # None = all USDT perpetuals
+SPECIFIC_SYMBOLS = None                       # None = use DEFAULT_GROUP; ["ETHUSDT"] = specific symbols
+DEFAULT_GROUP = "USDT"                        # group for Spyder mode (see Symbol groups)
 CONCURRENT_WORKERS = 3                        # parallel download threads
 DOWNLOAD_TIMEOUT = 120                        # seconds
 SYMBOL_DELAY = 2.0                            # pause between symbols
 ```
+
+Priority chain: CLI `--symbols` > `symbols_override()` > `SPECIFIC_SYMBOLS` > `DEFAULT_GROUP`.
 
 #### Parquet compression
 
@@ -49,17 +52,33 @@ PARQUET_ROW_GROUP_SIZE = 500_000              # rows per row group
 ### Command line — futures trades
 
 ```bash
-bybit_futures_trades.py --symbols ETHUSDT SOLUSDT
-bybit_futures_trades.py --symbols BTCUSDT --workers 3
-bybit_futures_trades.py --all
+bybit_futures_trades.py --usdt                         # all USDT perpetual futures
+bybit_futures_trades.py --stable                       # stablecoin pairs (USDC, FDUSD, etc. vs USDT)
+bybit_futures_trades.py --futures                      # delivery futures (BTC-28FEB26, ETH-01MAR24)
+bybit_futures_trades.py --quarterly                    # quarterly futures (BTCUSDH26)
+bybit_futures_trades.py --inverse                      # inverse contracts (BTCUSD, ETHUSD)
+bybit_futures_trades.py --perp                         # PERP contracts
+bybit_futures_trades.py --group STABLE --workers 3     # group name + options
+bybit_futures_trades.py --symbols ETHUSDT SOLUSDT      # specific symbols
 ```
 
 ### Command line — spot trades
 
 ```bash
-bybit_spot_trades.py --symbols ETHUSDT SOLUSDT
-bybit_spot_trades.py --symbols BTCUSDT --workers 3
-bybit_spot_trades.py --all
+bybit_spot_trades.py --usdt                           # all USDT spot pairs
+bybit_spot_trades.py --usdc                           # all USDC spot pairs
+bybit_spot_trades.py --dai                            # DAI-quoted pairs
+bybit_spot_trades.py --rlusd                          # RLUSD-quoted pairs
+bybit_spot_trades.py --usde                           # USDE-quoted pairs
+bybit_spot_trades.py --usdq                           # USDQ-quoted pairs
+bybit_spot_trades.py --usdr                           # USDR-quoted pairs
+bybit_spot_trades.py --usd1                           # USD1-quoted pairs
+bybit_spot_trades.py --xusd                           # XUSD-quoted pairs
+bybit_spot_trades.py --crypto                         # crypto-quoted pairs (BTC, ETH, SOL, etc.)
+bybit_spot_trades.py --fiat                           # fiat pairs (EUR, GBP, BRL, etc.)
+bybit_spot_trades.py --leveraged                      # leveraged tokens (BTC3L, ETH3S, etc.)
+bybit_spot_trades.py --group FIAT --workers 5         # group name + options
+bybit_spot_trades.py --symbols ETHUSDT SOLUSDT        # specific symbols
 ```
 
 ### Spot trades — monthly files
@@ -70,7 +89,7 @@ Spot data on the server has two file naming patterns: daily (`SYMBOL_YYYY-MM-DD.
 
 ## Orderbook scripts
 
-Data source: [quote-saver.bycsi.com](https://quote-saver.bycsi.com) — daily .data.zip files containing orderbook snapshots and incremental deltas in JSONL format. Described on the [Bybit website](https://www.bybit.com/derivatives/en/history-data) as OrderBook.
+Data source: [quote-saver.bycsi.com](https://quote-saver.bycsi.com) — daily .data.zip files containing orderbook snapshots and incremental deltas in JSONL format. Described on the Bybit website as OrderBook.
 
 ### Pipeline
 
@@ -97,9 +116,10 @@ Format: `YYYY-MM-DD_SYMBOL_ob{depth}.data.zip` where depth is 200 or 500.
 Set at the top of the script:
 
 ```python
-SPECIFIC_SYMBOLS = ["ETHUSDT", "BTCUSDT"]     # None = all USDT pairs
+SPECIFIC_SYMBOLS = None                       # None = use DEFAULT_GROUP; ["ETHUSDT"] = specific symbols
+DEFAULT_GROUP = "USDT"                        # group for Spyder mode (see Symbol groups)
 CONCURRENT_WORKERS = 3                        # parallel download threads
-DOWNLOAD_TIMEOUT = 600                        # seconds (files are large, up to ~300 MB)
+DOWNLOAD_TIMEOUT = 600                        # seconds (files are large)
 SYMBOL_DELAY = 2.0                            # pause between symbols
 PROXY_URL = False                             # e.g. "http://127.0.0.1:2080" or False
 ```
@@ -115,17 +135,32 @@ PARQUET_ROW_GROUP_SIZE = 500_000              # rows per row group
 ### Command line — futures orderbook
 
 ```bash
-bybit_futures_orderbook.py --symbols ETHUSDT SOLUSDT
-bybit_futures_orderbook.py --symbols BTCUSDT --workers 1
-bybit_futures_orderbook.py --all
+bybit_futures_orderbook.py --usdt                                # all USDT perpetual futures
+bybit_futures_orderbook.py --stable                              # stablecoin pairs (USDC, FDUSD, etc. vs USDT)
+bybit_futures_orderbook.py --futures                             # delivery futures (BTC-28FEB26, ETH-01MAR24)
+bybit_futures_orderbook.py --usdt-futures                        # USDT delivery futures (BTCUSDT-01AUG25)
+bybit_futures_orderbook.py --perp                                # PERP contracts
+bybit_futures_orderbook.py --group USDT_FUTURES --workers 1      # group name + options
+bybit_futures_orderbook.py --symbols ETHUSDT SOLUSDT             # specific symbols
 ```
 
 ### Command line — spot orderbook
 
 ```bash
-bybit_spot_orderbook.py --symbols ETHUSDT SOLUSDT
-bybit_spot_orderbook.py --symbols BTCUSDT --workers 1
-bybit_spot_orderbook.py --all
+bybit_spot_orderbook.py --usdt                          # all USDT spot pairs
+bybit_spot_orderbook.py --usdc                          # all USDC spot pairs
+bybit_spot_orderbook.py --dai                           # DAI-quoted pairs
+bybit_spot_orderbook.py --rlusd                         # RLUSD-quoted pairs
+bybit_spot_orderbook.py --usde                          # USDE-quoted pairs
+bybit_spot_orderbook.py --usdq                          # USDQ-quoted pairs
+bybit_spot_orderbook.py --usdr                          # USDR-quoted pairs
+bybit_spot_orderbook.py --usd1                          # USD1-quoted pairs
+bybit_spot_orderbook.py --xusd                          # XUSD-quoted pairs
+bybit_spot_orderbook.py --crypto                        # crypto-quoted pairs (BTC, ETH, SOL, etc.)
+bybit_spot_orderbook.py --fiat                          # fiat pairs (EUR, GBP, BRL, etc.)
+bybit_spot_orderbook.py --leveraged                     # leveraged tokens (BTC3L, ETH3S, etc.)
+bybit_spot_orderbook.py --group USDC --workers 1        # group name + options
+bybit_spot_orderbook.py --symbols ETHUSDT SOLUSDT       # specific symbols
 ```
 
 ### Differences from trades scripts
@@ -160,18 +195,117 @@ bybit_spot_orderbook.py --all
 
 ### Spyder / Jupyter
 
-Set `SPECIFIC_SYMBOLS` in the script and run.
+Set `SPECIFIC_SYMBOLS` to a list of symbols or leave as `None` to use `DEFAULT_GROUP`, then run.
 
 ### Command line
 
-All scripts support `--all`, `--symbols`, `--workers`, `--timeout` flags:
+All scripts require exactly one selection flag (mutually exclusive):
 
 ```
---all                Download all available symbols
---symbols SYM1 SYM2  Download only specified symbols
---workers N          Number of parallel download threads
---timeout N          Download timeout per file in seconds
+--group NAME                Select symbol group by name
+--symbols SYM1 SYM2         Specific symbols
+--usdt / --stable / ...     Shorthand flags per script (see below)
+--workers N                 Parallel download threads
+--timeout N                 Download timeout per file in seconds
 ```
+
+No `--all` flag — use `--group <NAME>` to select a symbol group (see [Symbol groups](#symbol-groups)).
+
+---
+
+## Symbol groups
+
+Each script defines groups of symbols matched by regex. Shorthand CLI flags are provided for each group. Symbol lists are fetched from the server and filtered at runtime.
+
+### Futures trades — FUTURES_TRADES_GROUPS
+
+| Group | Shorthand | Description | Example symbols |
+|---|---|---|---|
+| `USDT` | `--usdt` | USDT perpetual futures | ETHUSDT, BTCUSDT, SOLUSDT |
+| `PERP` | `--perp` | PERP contracts | BTCPERP, 1000PEPEPERP |
+| `STABLE` | `--stable` | Stablecoin pairs | USDCUSDT, FDUSDUSDT, BUSDUSDT |
+| `FUTURES` | `--futures` | Delivery futures | BTC-28FEB26, ETH-01MAR24 |
+| `QUARTERLY` | `--quarterly` | Quarterly futures | BTCUSDH26, ETHUSDM25 |
+| `INVERSE` | `--inverse` | Inverse (crypto-margined) | BTCUSD, ETHUSD, XRPUSD |
+
+### Futures orderbook — FUTURES_ORDERBOOK_GROUPS
+
+| Group | Shorthand | Description | Example symbols |
+|---|---|---|---|
+| `USDT` | `--usdt` | USDT perpetual futures | ETHUSDT, BTCUSDT, SOLUSDT |
+| `PERP` | `--perp` | PERP contracts | BTCPERP, 1000PEPEPERP |
+| `STABLE` | `--stable` | Stablecoin pairs | USDCUSDT, FDUSDUSDT, BUSDUSDT |
+| `FUTURES` | `--futures` | Delivery futures | BTC-28FEB26, ETH-01MAR24 |
+| `USDT_FUTURES` | `--usdt-futures` | USDT delivery futures | BTCUSDT-01AUG25, ETHUSDT-02JAN26 |
+
+> `QUARTERLY` and `INVERSE` groups (available in futures_trades) will be added later.
+
+### Spot trades — SPOT_TRADES_GROUPS
+
+| Group | Shorthand | Description | Example symbols |
+|---|---|---|---|
+| `USDT` | `--usdt` | USDT spot pairs | ETHUSDT, BTCUSDT, SOLUSDT |
+| `USDC` | `--usdc` | USDC spot pairs | ETHUSDC, BTCUSDC, SOLUSDC |
+| `DAI` | `--dai` | DAI-quoted pairs | BTCDAI, ETHDAI, BITDAI |
+| `RLUSD` | `--rlusd` | RLUSD-quoted pairs | BTCRLUSD, ETHRLUSD, MNTRLUSD, XRPRLUSD |
+| `USDE` | `--usde` | USDE-quoted pairs | BTCUSDE, ETHUSDE, 1000PEPEUSDE |
+| `USDQ` | `--usdq` | USDQ-quoted pairs | BTCUSDQ, ETHUSDQ |
+| `USDR` | `--usdr` | USDR-quoted pairs | BTCUSDR, ETHUSDR |
+| `USD1` | `--usd1` | USD1-quoted pairs | BTCUSD1, ETHUSD1 |
+| `XUSD` | `--xusd` | XUSD-quoted pairs | BTCXUSD, ETHXUSD |
+| `FIAT` | `--fiat` | Fiat pairs | BTCEUR, ETHBRL, SOLGBP |
+| `CRYPTO` | `--crypto` | Crypto-quoted pairs | ETHBTC, SOLBNB, MNTETH |
+| `LEVERAGED` | `--leveraged` | Leveraged tokens | BTC3LUSDT, ETH3SUSDT, ADA2LUSDT |
+
+### Spot orderbook — SPOT_ORDERBOOK_GROUPS
+
+| Group | Shorthand | Description | Example symbols |
+|---|---|---|---|
+| `USDT` | `--usdt` | USDT spot pairs | ETHUSDT, BTCUSDT, SOLUSDT |
+| `USDC` | `--usdc` | USDC spot pairs | ETHUSDC, BTCUSDC, SOLUSDC |
+| `DAI` | `--dai` | DAI-quoted pairs | BTCDAI, ETHDAI |
+| `RLUSD` | `--rlusd` | RLUSD-quoted pairs | BTCRLUSD, ETHRLUSD, MNTRLUSD |
+| `USDE` | `--usde` | USDE-quoted pairs | BTCUSDE, ETHUSDE |
+| `USDQ` | `--usdq` | USDQ-quoted pairs | BTCUSDQ, ETHUSDQ |
+| `USDR` | `--usdr` | USDR-quoted pairs | BTCUSDR, ETHUSDR |
+| `USD1` | `--usd1` | USD1-quoted pairs | BTCUSD1, ETHUSD1 |
+| `XUSD` | `--xusd` | XUSD-quoted pairs | BTCXUSD, ETHXUSD |
+| `FIAT` | `--fiat` | Fiat pairs | BTCEUR, ETHBRL, SOLGBP |
+| `CRYPTO` | `--crypto` | Crypto-quoted pairs | ETHBTC, SOLBNB, DOTETH |
+| `LEVERAGED` | `--leveraged` | Leveraged tokens | BTC3LUSDT, ETH3SUSDT, ADA2LUSDT |
+
+Groups are mutually exclusive — each symbol matches at most one group. Symbol lists are fetched from the server at runtime and filtered by group regex.
+
+### Verification — bybit_verify_groups.py
+
+The script `bybit_verify_groups.py` verifies symbol group classification for all 4 downloaders against live server data. It reads regex patterns directly from the script files (no changes to the downloaders are required) and reports matched, unmatched, and overlapping symbols.
+
+```bash
+python bybit_verify_groups.py                                  # all 4 scripts
+python bybit_verify_groups.py --trades                         # futures_trades + spot_trades
+python bybit_verify_groups.py --orderbook                      # futures_orderbook + spot_orderbook
+python bybit_verify_groups.py --full                           # print all symbols per group
+python bybit_verify_groups.py --group USDT                     # show USDT group across selected scripts
+python bybit_verify_groups.py --group DAI                      # show DAI group across selected scripts
+python bybit_verify_groups.py --trades --group CRYPTO          # CRYPTO group in trades scripts only
+python bybit_verify_groups.py --orderbook --group LEVERAGED
+```
+
+After run, the global variable `ALL_SYMBOLS` contains sorted symbols per group per script (can be used in Spyder / Jupyter):
+
+```python
+ALL_SYMBOLS = {
+    "futures_trades":    {"symbols": [...], "groups": {"USDT": [...], ...}, ...},
+    "futures_orderbook": {"symbols": [...], "groups": {"USDT": [...], ...}, ...},
+    "spot_trades":       {"symbols": [...], "groups": {"USDT": [...], ...}, ...},
+    "spot_orderbook":    {"symbols": [...], "groups": {"USDT": [...], ...}, ...},
+}
+```
+
+> **Important: check classification accuracy regularly.** New groups are not added in real-time. If Bybit adds a new fiat currency or a new stablecoin, pairs like `BTC{NEW_FIAT}` or `ETH{NEW_STABLE}` may fall into the CRYPTO group until the classification is updated. Similarly, `{NEW_STABLE}USDT` pairs (e.g. `TUSDUSDT`, `FDUSDUSDT`) may fall into the USDT group. Run `bybit_verify_groups.py` periodically and check for unmatched symbols or unexpected symbols in CRYPTO and USDT.
+>
+> In the future, the project is planned to migrate from static regex-based group definitions to dynamic group formation based on server data, which will improve reliability.
+
 
 ---
 
