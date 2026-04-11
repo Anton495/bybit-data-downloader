@@ -32,11 +32,11 @@ Csv.gz files are never written to disk — everything happens in RAM.
 Set at the top of the script:
 
 ```python
-SPECIFIC_SYMBOLS = None                       # None = use DEFAULT_GROUP; ["ETHUSDT"] = specific symbols
-DEFAULT_GROUP = "USDT"                        # group for Spyder mode (see Symbol groups)
-CONCURRENT_WORKERS = 3                        # parallel download threads
-DOWNLOAD_TIMEOUT = 120                        # seconds
-SYMBOL_DELAY = 2.0                            # pause between symbols
+SPECIFIC_SYMBOLS = None                    # None = use DEFAULT_GROUP; ["ETHUSDT"] = specific symbols
+DEFAULT_GROUP = "USDT"                     # group for Spyder mode (see Symbol groups)
+CONCURRENT_WORKERS = 3                     # parallel download threads
+DOWNLOAD_TIMEOUT = 120                     # seconds
+SYMBOL_DELAY = 2.0                         # pause between symbols
 ```
 
 Priority chain: CLI `--symbols` > `symbols_override()` > `SPECIFIC_SYMBOLS` > `DEFAULT_GROUP`.
