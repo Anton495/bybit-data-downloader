@@ -6,6 +6,10 @@ gzip integrity via in-memory decompression (CRC32 + deflate), converts to
 Parquet (ZSTD, sorted by timestamp, deduplicated by id).
 Csv.gz files are never written to disk — only the final .parquet is persisted.
 
+Spot CSV columns:
+  New files: id, timestamp, price, volume, side, rpi
+  Old files: id, timestamp, price, volume, side
+
 Manifest format (one per symbol):  filename size [true|false]
   - no status (pending)  — file has not been processed yet
   - true                — parquet file successfully created on disk
@@ -42,20 +46,42 @@ from tqdm import tqdm
 BASE_URL = "https://public.bybit.com"
 TRADING_PATH = "/spot/"
 OUTPUT_DIR = "bybit_data/spot/trades"
-# If None — all USDT spot pairs are downloaded
-# If a list — only the specified symbols
-SPECIFIC_SYMBOLS: Optional[List[str]] = None  # None = all; ["ETHUSDT"] = specific
+# If a list — only the specified symbols (Spyder / Jupyter mode)
+# If None — DEFAULT_GROUP is used to fetch symbols from the server
+SPECIFIC_SYMBOLS: Optional[List[str]] = None  # None = use DEFAULT_GROUP; ["ETHUSDT"] = specific
+# Default group for Spyder / Jupyter mode (when SPECIFIC_SYMBOLS is None).
+# Set to None to disable auto-fetch (must use --group on CLI).
+# Possible values: 'USDT', 'USDC', 'DAI', 'RLUSD', 'USDE', 'USDQ', 'USDR', 'USD1', 'XUSD', 'FIAT', 'CRYPTO', 'LEVERAGED'
+DEFAULT_GROUP: Optional[str] = "USDT"
 DOWNLOAD_TIMEOUT = 120          # read timeout per file (seconds)
-CONNECT_TIMEOUT = 15           # connect timeout (seconds)
+CONNECT_TIMEOUT = 15            # connect timeout (seconds)
 MAX_RETRIES = 3
 RETRY_DELAY = 5
-CONCURRENT_WORKERS = 3        # parallel threads (each: download + convert)
-SYMBOL_DELAY = 2.0             # seconds to pause between symbols (rate-limit mitigation)
+CONCURRENT_WORKERS = 3          # parallel threads (each: download + convert)
+SYMBOL_DELAY = 2.0              # seconds to pause between symbols (rate-limit mitigation)
 
 # Parquet write settings
 PARQUET_COMPRESSION = "zstd"
 PARQUET_COMPRESSION_LEVEL = 3
 PARQUET_ROW_GROUP_SIZE = 500_000
+
+# Symbol group filters — regex patterns for matching spot symbols on the server.
+# Groups are evaluated in priority order: first match wins (no overlaps).
+# Used by CLI --group flags and by DEFAULT_GROUP in Spyder mode.
+SPOT_TRADES_GROUPS = {
+    'LEVERAGED': r'^[A-Z]+\d[LS]USDT$',
+    'FIAT':         r'^[A-Z0-9]+(?:EUR|BRL|ARS|TRY|GBP|AED|UAH|IDRT|PLN|BRZ|KUNCI)$',
+    'CRYPTO':       r'^[A-Z0-9]+(?:BTC|ETH|SOL|MNT|BNB)$',
+    'USDC':         r'^[A-Z0-9]+USDC$',
+    'DAI':          r'^[A-Z0-9]+DAI$',
+    'RLUSD':        r'^[A-Z0-9]+RLUSD$',
+    'USDE':         r'^[A-Z0-9]+USDE$',
+    'USDQ':         r'^[A-Z0-9]+USDQ$',
+    'USDR':         r'^[A-Z0-9]+USDR$',
+    'USD1':         r'^[A-Z0-9]+USD1$',
+    'XUSD':         r'^[A-Z0-9]+XUSD$',
+    'USDT':         r'^(?![A-Z]+\d[LS]USDT$)[A-Z0-9]+USDT$',
+}
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -115,12 +141,19 @@ def parse_file_links(html: str, symbol: str) -> List[str]:
     """Returns full filenames matching SYMBOL*.csv.gz (includes symbol prefix)."""
     return sorted(re.findall(rf'href="({re.escape(symbol)}[^"]+\.csv\.gz)"', html))
 
-def get_all_spot_usdt() -> List[str]:
+def get_all_symbols() -> List[str]:
+    """Fetches all symbol directories from the server (unfiltered)."""
     url = f"{BASE_URL}{TRADING_PATH}"
     resp = get_session().get(url, timeout=30)
     resp.raise_for_status()
-    all_dirs = parse_directory_links(resp.text)
-    return sorted([d for d in all_dirs if d.endswith("USDT") and "-" not in d])
+    return parse_directory_links(resp.text)
+
+def filter_by_group(all_symbols: List[str], group: str) -> List[str]:
+    """Filters symbols by group name using SPOT_TRADES_GROUPS regex."""
+    pattern = SPOT_TRADES_GROUPS.get(group)
+    if pattern is None:
+        raise ValueError(f"Unknown group: {group}. Available: {', '.join(SPOT_TRADES_GROUPS)}")
+    return sorted([s for s in all_symbols if re.match(pattern, s)])
 
 def get_remote_files(symbol: str) -> List[str]:
     url = f"{BASE_URL}{TRADING_PATH}{symbol}/"
@@ -421,25 +454,80 @@ def download_symbol(symbol: str, workers: int = CONCURRENT_WORKERS, timeout: int
 # =============================================================================
 # CLI and entry point
 # =============================================================================
+_GROUP_CHOICES = list(SPOT_TRADES_GROUPS.keys())
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Download Bybit spot trades (.csv.gz) → convert to Parquet → bybit_data/spot/trades/{symbol}/",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
-python bybit_spot_trades.py --all
+python bybit_spot_trades.py --usdt
+python bybit_spot_trades.py --usdc
+python bybit_spot_trades.py --dai
+python bybit_spot_trades.py --rlusd
+python bybit_spot_trades.py --usde
+python bybit_spot_trades.py --fiat --workers 5
 python bybit_spot_trades.py --symbols ETHUSDT SOLUSDT
-python bybit_spot_trades.py --symbols BTCUSDT --workers 5
-No arguments (Spyder): uses SPECIFIC_SYMBOLS from script configuration.
+python bybit_spot_trades.py --group CRYPTO
+No arguments (Spyder): uses SPECIFIC_SYMBOLS or DEFAULT_GROUP from script configuration.
 """,
     )
-    group = parser.add_mutually_exclusive_group()
+    group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
-        "--all", action="store_true",
-        help="Download all USDT spot pairs",
+        "--usdt", action="store_true",
+        help="All USDT spot pairs",
+    )
+    group.add_argument(
+        "--usdc", action="store_true",
+        help="All USDC spot pairs",
+    )
+    group.add_argument(
+        "--dai", action="store_true",
+        help="DAI-quoted pairs",
+    )
+    group.add_argument(
+        "--rlusd", action="store_true",
+        help="RLUSD-quoted pairs",
+    )
+    group.add_argument(
+        "--fiat", action="store_true",
+        help="Fiat pairs (EUR, BRL, ARS, TRY, GBP, etc.)",
+    )
+    group.add_argument(
+        "--usde", action="store_true",
+        help="USDE-quoted pairs",
+    )
+    group.add_argument(
+        "--usdq", action="store_true",
+        help="USDQ-quoted pairs",
+    )
+    group.add_argument(
+        "--usdr", action="store_true",
+        help="USDR-quoted pairs",
+    )
+    group.add_argument(
+        "--usd1", action="store_true",
+        help="USD1-quoted pairs",
+    )
+    group.add_argument(
+        "--xusd", action="store_true",
+        help="XUSD-quoted pairs",
+    )
+    group.add_argument(
+        "--crypto", action="store_true",
+        help="Crypto-quoted pairs (BTC, ETH, SOL, MNT, BNB)",
+    )
+    group.add_argument(
+        "--leveraged", action="store_true",
+        help="Leveraged tokens (e.g. ADA2LUSDT, BTC3SUSDT)",
+    )
+    group.add_argument(
+        "--group", choices=_GROUP_CHOICES, metavar="NAME",
+        help=f"Select symbol group: {', '.join(_GROUP_CHOICES)}",
     )
     group.add_argument(
         "--symbols", nargs="+", metavar="SYM",
-        help="List of symbols (e.g. ETHUSDT SOLUSDT)",
+        help="List of specific symbols (e.g. ETHUSDT SOLUSDT AAVEUSDC)",
     )
     parser.add_argument(
         "--workers", type=int, default=None,
@@ -451,10 +539,27 @@ No arguments (Spyder): uses SPECIFIC_SYMBOLS from script configuration.
     )
     return parser
 
+# Map CLI flag attribute names → group names
+_FLAG_TO_GROUP = {
+    'usdt': 'USDT',
+    'usdc': 'USDC',
+    'dai': 'DAI',
+    'rlusd': 'RLUSD',
+    'usde': 'USDE',
+    'usdq': 'USDQ',
+    'usdr': 'USDR',
+    'usd1': 'USD1',
+    'xusd': 'XUSD',
+    'fiat': 'FIAT',
+    'crypto': 'CRYPTO',
+    'leveraged': 'LEVERAGED',
+}
+
 def main(symbols_override: Optional[List[str]] = None):
     workers = CONCURRENT_WORKERS
     timeout = DOWNLOAD_TIMEOUT
-    cli_symbols, force_all = None, False
+    cli_symbols = None
+    cli_group = None
 
     if len(sys.argv) > 1:
         parser = build_parser()
@@ -463,32 +568,43 @@ def main(symbols_override: Optional[List[str]] = None):
             workers = args.workers
         if args.timeout is not None:
             timeout = args.timeout
-        if args.all:
-            force_all = True
-        elif args.symbols:
-            cli_symbols = args.symbols
+        if args.symbols:
+            cli_symbols = [s.upper() for s in args.symbols]
+        elif args.group:
+            cli_group = args.group
+        else:
+            # Check shorthand flags (--usdt, --stable, etc.)
+            for attr, group_name in _FLAG_TO_GROUP.items():
+                if getattr(args, attr, False):
+                    cli_group = group_name
+                    break
 
-    if force_all:
-        target = None
-    elif cli_symbols is not None:
-        target = [s.upper() for s in cli_symbols]
-    elif symbols_override is not None:
-        target = [s.upper() for s in symbols_override]
-    else:
-        target = [s.upper() for s in SPECIFIC_SYMBOLS] if SPECIFIC_SYMBOLS else None
-
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    if target is not None:
-        symbols = sorted(target)
+    # Determine target: CLI > symbols_override > SPECIFIC_SYMBOLS > DEFAULT_GROUP
+    if cli_symbols is not None:
+        symbols = sorted(cli_symbols)
         print(f"Using specified list: {len(symbols)} symbols")
+    elif symbols_override is not None:
+        symbols = sorted(s.upper() for s in symbols_override)
+        print(f"Using override list: {len(symbols)} symbols")
+    elif SPECIFIC_SYMBOLS is not None:
+        symbols = sorted(s.upper() for s in SPECIFIC_SYMBOLS)
+        print(f"Using SPECIFIC_SYMBOLS: {len(symbols)} symbols")
     else:
-        print("Fetching USDT spot pairs list...")
+        group = cli_group or DEFAULT_GROUP
+        if group is None:
+            print("Error: no group specified. Set DEFAULT_GROUP or use --group/--symbols on CLI.")
+            return
+        print(f"Fetching symbols for group [{group}]...")
         try:
-            symbols = get_all_spot_usdt()
+            all_symbols = get_all_symbols()
+            symbols = filter_by_group(all_symbols, group)
+        except ValueError as e:
+            print(f"Error: {e}")
+            return
         except Exception as e:
             print(f"Error fetching symbol list: {e}")
             return
-        print(f"Found USDT spot pairs: {len(symbols)}")
+        print(f"Found {len(symbols)} symbols in group [{group}]")
 
     results = {"new": [], "updated": [], "skipped": [], "error": []}
     partial_failures: Dict[str, List[str]] = {}

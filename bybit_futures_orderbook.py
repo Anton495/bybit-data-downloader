@@ -59,21 +59,35 @@ from tqdm import tqdm
 BASE_URL = "https://quote-saver.bycsi.com"
 TRADING_PATH = "/orderbook/linear/"
 OUTPUT_DIR = "bybit_data/futures/orderbook"
-# If None — all USDT perpetual futures are downloaded
-# If a list — only the specified symbols
-SPECIFIC_SYMBOLS: Optional[List[str]] = None  # None = all; ["ETHUSDT"] = specific
-PROXY_URL = False # e.g. "http://127.0.0.1:2080" or False to disable
+# If a list — only the specified symbols (Spyder / Jupyter mode)
+# If None — DEFAULT_GROUP is used to fetch symbols from the server
+SPECIFIC_SYMBOLS: Optional[List[str]] = None  # None = use DEFAULT_GROUP; ["ETHUSDT"] = specific
+# Default group for Spyder / Jupyter mode (when SPECIFIC_SYMBOLS is None).
+# Set to None to disable auto-fetch (must use --group on CLI).
+# Possible values: 'USDT', 'STABLE', 'FUTURES', 'USDT_FUTURES', 'PERP'
+DEFAULT_GROUP: Optional[str] = "USDT"
+PROXY_URL = False  # e.g. "http://127.0.0.1:2080" or False to disable
 DOWNLOAD_TIMEOUT = 600          # seconds (files are large, up to ~300 MB)
-CONNECT_TIMEOUT = 15           # connect timeout (seconds)
+CONNECT_TIMEOUT = 15            # connect timeout (seconds)
 MAX_RETRIES = 3
 RETRY_DELAY = 5
-CONCURRENT_WORKERS = 3          # reduced (files are much larger than trades)
-SYMBOL_DELAY = 2.0             # seconds to pause between symbols (rate-limit mitigation)
+CONCURRENT_WORKERS = 3          # parallel threads (each: download + convert)
+SYMBOL_DELAY = 2.0              # seconds to pause between symbols (rate-limit mitigation)
 
 # Parquet write settings
 PARQUET_COMPRESSION = "zstd"
 PARQUET_COMPRESSION_LEVEL = 3
 PARQUET_ROW_GROUP_SIZE = 500_000
+
+# Symbol group filters — regex patterns for matching futures symbols on the server.
+# Used by CLI --group flags and by DEFAULT_GROUP in Spyder mode.
+FUTURES_ORDERBOOK_GROUPS = {
+    'STABLE':     r'^(USDC|FDUSD|BUSD|USDE|USTC|UST)USDT$',
+    'FUTURES':       r'^(BTC|ETH|SOL|XRP)-\d{2}[A-Z]{3}\d{2}$',
+    'USDT_FUTURES':  r'^[A-Z0-9]+USDT-\d{2}[A-Z]{3}\d{2}$',
+    'PERP':       r'^[A-Z0-9]+PERP$',
+    'USDT':       r'^(?!(USDC|FDUSD|BUSD|USDE|USTC|UST)USDT$)[A-Z0-9]+USDT$',
+}
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -144,13 +158,19 @@ def parse_file_links(html: str) -> List[str]:
     """Extract .data.zip filenames from directory listing."""
     return sorted(re.findall(r'href="([^"]+\.data\.zip)"', html))
 
-def get_all_usdt_perps() -> List[str]:
-    """Fetches all USDT perpetual symbols from the server."""
+def get_all_symbols() -> List[str]:
+    """Fetches all symbol directories from the server (unfiltered)."""
     url = f"{BASE_URL}{TRADING_PATH}"
     resp = get_session().get(url, timeout=30)
     resp.raise_for_status()
-    all_dirs = parse_directory_links(resp.text)
-    return sorted([d for d in all_dirs if d.endswith("USDT") and "-" not in d])
+    return parse_directory_links(resp.text)
+
+def filter_by_group(all_symbols: List[str], group: str) -> List[str]:
+    """Filters symbols by group name using FUTURES_ORDERBOOK_GROUPS regex."""
+    pattern = FUTURES_ORDERBOOK_GROUPS.get(group)
+    if pattern is None:
+        raise ValueError(f"Unknown group: {group}. Available: {', '.join(FUTURES_ORDERBOOK_GROUPS)}")
+    return sorted([s for s in all_symbols if re.match(pattern, s)])
 
 def get_remote_files(symbol: str) -> List[str]:
     """Fetches all .data.zip filenames for a given symbol."""
@@ -468,25 +488,49 @@ def download_symbol(symbol: str, workers: int = CONCURRENT_WORKERS, timeout: int
 # =============================================================================
 # CLI and entry point
 # =============================================================================
+_GROUP_CHOICES = list(FUTURES_ORDERBOOK_GROUPS.keys())
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Download Bybit orderbook (.data.zip) → convert to Parquet → bybit_data/futures/orderbook/{symbol}/",
+        description="Download Bybit futures orderbook (.data.zip) → convert to Parquet → bybit_data/futures/orderbook/{symbol}/",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
-python bybit_futures_orderbook.py --all
+python bybit_futures_orderbook.py --usdt
+python bybit_futures_orderbook.py --perp
+python bybit_futures_orderbook.py --date-short --workers 1
 python bybit_futures_orderbook.py --symbols ETHUSDT SOLUSDT
-python bybit_futures_orderbook.py --symbols BTCUSDT --workers 1
-No arguments (Spyder): uses SPECIFIC_SYMBOLS from script configuration.
+python bybit_futures_orderbook.py --group PERP
+No arguments (Spyder): uses SPECIFIC_SYMBOLS or DEFAULT_GROUP from script configuration.
 """,
     )
-    group = parser.add_mutually_exclusive_group()
+    group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
-        "--all", action="store_true",
-        help="Download all USDT perpetual symbols",
+        "--usdt", action="store_true",
+        help="All USDT perpetual futures",
+    )
+    group.add_argument(
+        "--stable", action="store_true",
+        help="Stablecoin pairs (USDC, FDUSD, BUSD, USDE, USTC, UST vs USDT)",
+    )
+    group.add_argument(
+        "--perp", action="store_true",
+        help="PERP contracts",
+    )
+    group.add_argument(
+        "--futures", action="store_true",
+        help="Delivery futures (BTC-28FEB26, ETH-01MAR24, etc.)",
+    )
+    group.add_argument(
+        "--usdt-futures", action="store_true",
+        help="USDT delivery futures (BTCUSDT-01AUG25, ETHUSDT-02JAN26, etc.)",
+    )
+    group.add_argument(
+        "--group", choices=_GROUP_CHOICES, metavar="NAME",
+        help=f"Select symbol group: {', '.join(_GROUP_CHOICES)}",
     )
     group.add_argument(
         "--symbols", nargs="+", metavar="SYM",
-        help="List of symbols (e.g. ETHUSDT SOLUSDT)",
+        help="List of specific symbols (e.g. ETHUSDT BTCPERP BTC-01DEC23)",
     )
     parser.add_argument(
         "--workers", type=int, default=None,
@@ -498,10 +542,20 @@ No arguments (Spyder): uses SPECIFIC_SYMBOLS from script configuration.
     )
     return parser
 
+# Map CLI flag attribute names → group names
+_FLAG_TO_GROUP = {
+    'usdt': 'USDT',
+    'stable': 'STABLE',
+    'perp': 'PERP',
+    'futures': 'FUTURES',
+    'usdt_futures': 'USDT_FUTURES',
+}
+
 def main(symbols_override: Optional[List[str]] = None):
     workers = CONCURRENT_WORKERS
     timeout = DOWNLOAD_TIMEOUT
-    cli_symbols, force_all = None, False
+    cli_symbols = None
+    cli_group = None
 
     if len(sys.argv) > 1:
         parser = build_parser()
@@ -510,32 +564,45 @@ def main(symbols_override: Optional[List[str]] = None):
             workers = args.workers
         if args.timeout is not None:
             timeout = args.timeout
-        if args.all:
-            force_all = True
-        elif args.symbols:
-            cli_symbols = args.symbols
+        if args.symbols:
+            cli_symbols = [s.upper() for s in args.symbols]
+        elif args.group:
+            cli_group = args.group
+        else:
+            # Check shorthand flags (--usdt, --perp, etc.)
+            for attr, group_name in _FLAG_TO_GROUP.items():
+                if getattr(args, attr, False):
+                    cli_group = group_name
+                    break
 
-    if force_all:
-        target = None
-    elif cli_symbols is not None:
-        target = [s.upper() for s in cli_symbols]
-    elif symbols_override is not None:
-        target = [s.upper() for s in symbols_override]
-    else:
-        target = [s.upper() for s in SPECIFIC_SYMBOLS] if SPECIFIC_SYMBOLS else None
-
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    if target is not None:
-        symbols = sorted(target)
+    # Determine target: CLI > symbols_override > SPECIFIC_SYMBOLS > DEFAULT_GROUP
+    if cli_symbols is not None:
+        symbols = sorted(cli_symbols)
         print(f"Using specified list: {len(symbols)} symbols")
+    elif symbols_override is not None:
+        symbols = sorted(s.upper() for s in symbols_override)
+        print(f"Using override list: {len(symbols)} symbols")
+    elif SPECIFIC_SYMBOLS is not None:
+        symbols = sorted(s.upper() for s in SPECIFIC_SYMBOLS)
+        print(f"Using SPECIFIC_SYMBOLS: {len(symbols)} symbols")
     else:
-        print("Fetching USDT perpetual symbols list...")
+        group = cli_group or DEFAULT_GROUP
+        if group is None:
+            print("Error: no group specified. Set DEFAULT_GROUP or use --group/--symbols on CLI.")
+            return
+        print(f"Fetching symbols for group [{group}]...")
         try:
-            symbols = get_all_usdt_perps()
+            all_symbols = get_all_symbols()
+            symbols = filter_by_group(all_symbols, group)
+        except ValueError as e:
+            print(f"Error: {e}")
+            return
         except Exception as e:
             print(f"Error fetching symbol list: {e}")
             return
-        print(f"Found USDT perpetual symbols: {len(symbols)}")
+        print(f"Found {len(symbols)} symbols in group [{group}]")
+
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     results = {"new": [], "updated": [], "skipped": [], "error": []}
     partial_failures: Dict[str, List[str]] = {}
