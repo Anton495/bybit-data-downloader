@@ -27,6 +27,15 @@ GET .csv.gz → RAM (gzip.decompress, CRC32 check) → Polars CSV read → sort 
 
 Csv.gz files are never written to disk — everything happens in RAM.
 
+### File naming
+
+```
+Futures:  SYMBOLYYYY-MM-DD.csv.gz       →  SYMBOLYYYY-MM-DD.parquet
+Spot:     SYMBOL_YYYY-MM-DD.csv.gz      →  SYMBOL_YYYY-MM-DD.parquet
+```
+
+Note the difference: futures filenames have no separator between symbol and date, while spot filenames use an underscore.
+
 ### Configuration
 
 Set at the top of the script:
