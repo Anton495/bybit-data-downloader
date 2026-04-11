@@ -70,7 +70,7 @@ PARQUET_ROW_GROUP_SIZE = 500_000
 # Used by CLI --group flags and by DEFAULT_GROUP in Spyder mode.
 SPOT_TRADES_GROUPS = {
     'LEVERAGED': r'^[A-Z]+\d[LS]USDT$',
-    'FIAT':         r'^[A-Z0-9]+(?:EUR|BRL|ARS|TRY|GBP|AED|UAH|IDRT|PLN|BRZ|KUNCI)$',
+    'FIAT':         r'^[A-Z0-9]+(?:EUR|BRL|ARS|TRY|GBP|AED|UAH|PLN|BRZ)$',
     'CRYPTO':       r'^[A-Z0-9]+(?:BTC|ETH|SOL|MNT|BNB)$',
     'USDC':         r'^[A-Z0-9]+USDC$',
     'DAI':          r'^[A-Z0-9]+DAI$',
