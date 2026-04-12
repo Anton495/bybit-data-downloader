@@ -17,7 +17,7 @@ Two data sources, four separate scripts:
 
 ## Trades scripts
 
-Data source: [public.bybit.com](https://public.bybit.com) — daily CSV files with all trades for spot and perpetual futures. Described on the [Bybit website](https://www.bybit.com/derivatives/en/history-data) as Public Trading History.
+Data source: [public.bybit.com](https://public.bybit.com) — daily CSV files with all trades for spot and futures. Described on the [Bybit website](https://www.bybit.com/derivatives/en/history-data) as Public Trading History.
 
 ### Pipeline
 
