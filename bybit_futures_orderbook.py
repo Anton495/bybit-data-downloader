@@ -64,15 +64,15 @@ OUTPUT_DIR = "bybit_data/futures/orderbook"
 SPECIFIC_SYMBOLS: Optional[List[str]] = None  # None = use DEFAULT_GROUP; ["ETHUSDT"] = specific
 # Default group for Spyder / Jupyter mode (when SPECIFIC_SYMBOLS is None).
 # Set to None to disable auto-fetch (must use --group on CLI).
-# Possible values: 'USDT', 'STABLE', 'FUTURES', 'USDT_FUTURES', 'PERP'
+# Possible values: 'USDT', 'STABLE', 'FUTURES', 'USDT_FUTURES', 'PERP', 'QUARTERLY', 'INVERSE'
 DEFAULT_GROUP: Optional[str] = "USDT"
 PROXY_URL = False  # e.g. "http://127.0.0.1:2080" or False to disable
 DOWNLOAD_TIMEOUT = 600          # seconds (files are large, up to ~300 MB)
-CONNECT_TIMEOUT = 15            # connect timeout (seconds)
+CONNECT_TIMEOUT = 15           # connect timeout (seconds)
 MAX_RETRIES = 3
 RETRY_DELAY = 5
-CONCURRENT_WORKERS = 3          # parallel threads (each: download + convert)
-SYMBOL_DELAY = 2.0              # seconds to pause between symbols (rate-limit mitigation)
+CONCURRENT_WORKERS = 2          # reduced (files are much larger than trades)
+SYMBOL_DELAY = 2.0             # seconds to pause between symbols (rate-limit mitigation)
 
 # Parquet write settings
 PARQUET_COMPRESSION = "zstd"
@@ -86,7 +86,15 @@ FUTURES_ORDERBOOK_GROUPS = {
     'FUTURES':       r'^(BTC|ETH|SOL|XRP)-\d{2}[A-Z]{3}\d{2}$',
     'USDT_FUTURES':  r'^[A-Z0-9]+USDT-\d{2}[A-Z]{3}\d{2}$',
     'PERP':       r'^[A-Z0-9]+PERP$',
+    'QUARTERLY':  r'^(BTC|ETH)USD[FHJKMNQUVXZ]\d{2}$',
+    'INVERSE':    r'^[A-Z]+USD$',
     'USDT':       r'^(?!(USDC|FDUSD|BUSD|USDE|USTC|UST)USDT$)[A-Z0-9]+USDT$',
+}
+
+# Per-group server path overrides (default: TRADING_PATH = /orderbook/linear/)
+_GROUP_PATHS = {
+    'QUARTERLY': '/orderbook/inverse/',
+    'INVERSE':   '/orderbook/inverse/',
 }
 
 HEADERS = {
@@ -158,9 +166,10 @@ def parse_file_links(html: str) -> List[str]:
     """Extract .data.zip filenames from directory listing."""
     return sorted(re.findall(r'href="([^"]+\.data\.zip)"', html))
 
-def get_all_symbols() -> List[str]:
+def get_all_symbols(trading_path: Optional[str] = None) -> List[str]:
     """Fetches all symbol directories from the server (unfiltered)."""
-    url = f"{BASE_URL}{TRADING_PATH}"
+    path = trading_path or TRADING_PATH
+    url = f"{BASE_URL}{path}"
     resp = get_session().get(url, timeout=30)
     resp.raise_for_status()
     return parse_directory_links(resp.text)
@@ -172,9 +181,10 @@ def filter_by_group(all_symbols: List[str], group: str) -> List[str]:
         raise ValueError(f"Unknown group: {group}. Available: {', '.join(FUTURES_ORDERBOOK_GROUPS)}")
     return sorted([s for s in all_symbols if re.match(pattern, s)])
 
-def get_remote_files(symbol: str) -> List[str]:
+def get_remote_files(symbol: str, trading_path: Optional[str] = None) -> List[str]:
     """Fetches all .data.zip filenames for a given symbol."""
-    url = f"{BASE_URL}{TRADING_PATH}{symbol}/"
+    path = trading_path or TRADING_PATH
+    url = f"{BASE_URL}{path}{symbol}/"
     resp = get_session().get(url, timeout=30)
     resp.raise_for_status()
     return parse_file_links(resp.text)
@@ -382,14 +392,14 @@ def download_and_convert(url: str, parquet_path: str, timeout: int = DOWNLOAD_TI
 # =============================================================================
 # Process one symbol
 # =============================================================================
-def download_symbol(symbol: str, workers: int = CONCURRENT_WORKERS, timeout: int = DOWNLOAD_TIMEOUT) -> Tuple[str, List[str]]:
+def download_symbol(symbol: str, workers: int = CONCURRENT_WORKERS, timeout: int = DOWNLOAD_TIMEOUT, trading_path: Optional[str] = None) -> Tuple[str, List[str]]:
     """
     Downloads and converts all files for one symbol.
     Returns (status, failed_files) tuple.
     """
     print(f"\n{'='*70}\n{symbol}\n{'='*70}")
     try:
-        remote_files = get_remote_files(symbol)
+        remote_files = get_remote_files(symbol, trading_path=trading_path)
     except Exception as e:
         print(f"  Error fetching file list: {e}")
         return "error", []
@@ -496,8 +506,9 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
 python bybit_futures_orderbook.py --usdt
+python bybit_futures_orderbook.py --inverse
+python bybit_futures_orderbook.py --quarterly
 python bybit_futures_orderbook.py --perp
-python bybit_futures_orderbook.py --date-short --workers 1
 python bybit_futures_orderbook.py --symbols ETHUSDT SOLUSDT
 python bybit_futures_orderbook.py --group PERP
 No arguments (Spyder): uses SPECIFIC_SYMBOLS or DEFAULT_GROUP from script configuration.
@@ -525,6 +536,14 @@ No arguments (Spyder): uses SPECIFIC_SYMBOLS or DEFAULT_GROUP from script config
         help="USDT delivery futures (BTCUSDT-01AUG25, ETHUSDT-02JAN26, etc.)",
     )
     group.add_argument(
+        "--quarterly", action="store_true",
+        help="Quarterly futures (BTCUSDH26, ETHUSDM26, etc.)",
+    )
+    group.add_argument(
+        "--inverse", action="store_true",
+        help="Inverse contracts (BTCUSD, ETHUSD, SOLUSD, etc.)",
+    )
+    group.add_argument(
         "--group", choices=_GROUP_CHOICES, metavar="NAME",
         help=f"Select symbol group: {', '.join(_GROUP_CHOICES)}",
     )
@@ -549,6 +568,8 @@ _FLAG_TO_GROUP = {
     'perp': 'PERP',
     'futures': 'FUTURES',
     'usdt_futures': 'USDT_FUTURES',
+    'quarterly': 'QUARTERLY',
+    'inverse': 'INVERSE',
 }
 
 def main(symbols_override: Optional[List[str]] = None):
@@ -590,9 +611,10 @@ def main(symbols_override: Optional[List[str]] = None):
         if group is None:
             print("Error: no group specified. Set DEFAULT_GROUP or use --group/--symbols on CLI.")
             return
+        effective_path = _GROUP_PATHS.get(group)
         print(f"Fetching symbols for group [{group}]...")
         try:
-            all_symbols = get_all_symbols()
+            all_symbols = get_all_symbols(trading_path=effective_path)
             symbols = filter_by_group(all_symbols, group)
         except ValueError as e:
             print(f"Error: {e}")
@@ -612,7 +634,7 @@ def main(symbols_override: Optional[List[str]] = None):
         if i > 1:
             time.sleep(SYMBOL_DELAY)
         print(f"\n[{i}/{len(symbols)}] {sym}")
-        status, failed_files = download_symbol(sym, workers=workers, timeout=timeout)
+        status, failed_files = download_symbol(sym, workers=workers, timeout=timeout, trading_path=effective_path)
         results[status].append(sym)
         if failed_files:
             partial_failures[sym] = failed_files

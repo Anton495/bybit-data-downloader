@@ -51,6 +51,13 @@ SCRIPTS = OrderedDict([
         "var_name": "FUTURES_ORDERBOOK_GROUPS",
         "parser": "orderbook",  # parse_directory_links from orderbook scripts
     }),
+    ("futures_orderbook_inverse", {
+        "path": os.path.join(SCRIPT_DIR, "bybit_futures_orderbook.py"),
+        "url": "https://quote-saver.bycsi.com/orderbook/inverse/",
+        "var_name": "FUTURES_ORDERBOOK_GROUPS",
+        "parser": "orderbook",
+        "label": "futures_orderbook (inverse)",  # display name in output
+    }),
     ("spot_trades", {
         "path": os.path.join(SCRIPT_DIR, "bybit_spot_trades.py"),
         "url": "https://public.bybit.com/spot/",
@@ -130,7 +137,7 @@ def run(selected: List[str]) -> None:
         groups = _extract_groups(cfg["path"], cfg["var_name"])
         parse_fn = _PARSERS[cfg["parser"]]
 
-        print(f"Fetching {name}...", end=" ", flush=True)
+        print(f"Fetching {cfg.get('label', name)}...", end=" ", flush=True)
         resp = requests.get(cfg["url"], timeout=30)
         resp.raise_for_status()
         symbols = parse_fn(resp.text)
@@ -157,6 +164,7 @@ def run(selected: List[str]) -> None:
         ALL_SYMBOLS[name] = {
             "symbols": symbols,
             "var_name": cfg["var_name"],
+            "label": cfg.get("label", name),
             "groups": classified,
             "unmatched": unmatched,
             "overlaps": overlaps,
@@ -179,7 +187,7 @@ def print_results() -> None:
             all_ok = False
 
         print(f"\n{'='*70}")
-        print(f"  {name}  —  {data['var_name']}")
+        print(f"  {data['label']}  —  {data['var_name']}")
         print(f"{'='*70}")
         print(f"  Total: {total}  |  Matched: {matched} ({pct:.1f}%)  |  "
               f"Unmatched: {unmatched_n}  |  Overlaps: {overlaps_n}")
@@ -212,7 +220,7 @@ def print_full() -> None:
     """Prints ALL_SYMBOLS with all symbol names listed per group."""
     for name, data in ALL_SYMBOLS.items():
         print(f"\n{'='*70}")
-        print(f"  {name}  —  {data['var_name']}")
+        print(f"  {data['label']}  —  {data['var_name']}")
         print(f"{'='*70}")
         print(f"  Total: {len(data['symbols'])}  |  "
               f"Unmatched: {len(data['unmatched'])}  |  "

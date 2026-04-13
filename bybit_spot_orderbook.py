@@ -64,15 +64,15 @@ OUTPUT_DIR = "bybit_data/spot/orderbook"
 SPECIFIC_SYMBOLS: Optional[List[str]] = None  # None = use DEFAULT_GROUP; ["ETHUSDT"] = specific
 # Default group for Spyder / Jupyter mode (when SPECIFIC_SYMBOLS is None).
 # Set to None to disable auto-fetch (must use --group on CLI).
-# Possible values: 'USDT', 'USDC', 'DAI', 'RLUSD', 'USDE', 'USDQ', 'USDR', 'USD1', 'XUSD', 'FIAT', 'CRYPTO', 'LEVERAGED'
+# Possible values: 'USDT', 'USDC', 'OTHER', 'FIAT', 'CRYPTO', 'LEVERAGED'
 DEFAULT_GROUP: Optional[str] = "USDT"
 PROXY_URL = False  # e.g. "http://127.0.0.1:2080" or False to disable
 DOWNLOAD_TIMEOUT = 600          # seconds (files are large, up to ~300 MB)
-CONNECT_TIMEOUT = 15            # connect timeout (seconds)
+CONNECT_TIMEOUT = 15           # connect timeout (seconds)
 MAX_RETRIES = 3
 RETRY_DELAY = 5
-CONCURRENT_WORKERS = 3          # parallel threads (each: download + convert)
-SYMBOL_DELAY = 2.0              # seconds to pause between symbols (rate-limit mitigation)
+CONCURRENT_WORKERS = 2          # reduced (files are much larger than trades)
+SYMBOL_DELAY = 2.0             # seconds to pause between symbols (rate-limit mitigation)
 
 # Parquet write settings
 PARQUET_COMPRESSION = "zstd"
@@ -83,18 +83,12 @@ PARQUET_ROW_GROUP_SIZE = 500_000
 # Used by CLI --group flags and by DEFAULT_GROUP in Spyder mode.
 # Patterns are mutually exclusive (no overlaps).
 SPOT_ORDERBOOK_GROUPS = {
-    'LEVERAGED':    r'^[A-Z]+[0-9]+[LS]USDT$',
-    'FIAT':         r'^[A-Z0-9]+(EUR|GBP|BRL|TRY|AED|KZT|PLN|IDR|BRZ)$',
-    'CRYPTO':       r'^[A-Z0-9]+(BTC|ETH|SOL|MNT)$',
+    'LEVERAGED':    r'^[A-Z]+\d[LS]USDT$',
+    'FIAT':         r'^[A-Z0-9]+(?:EUR|GBP|BRL|TRY|AED|KZT|PLN|IDR|BRZ)$',
+    'CRYPTO':       r'^[A-Z0-9]+(?:BTC|ETH|SOL|MNT)$',
     'USDC':         r'^[A-Z0-9]+USDC$',
-    'DAI':          r'^[A-Z0-9]+DAI$',
-    'RLUSD':        r'^[A-Z0-9]+RLUSD$',
-    'USDE':         r'^[A-Z0-9]+USDE$',
-    'USDQ':         r'^[A-Z0-9]+USDQ$',
-    'USDR':         r'^[A-Z0-9]+USDR$',
-    'USD1':         r'^[A-Z0-9]+USD1$',
-    'XUSD':         r'^[A-Z0-9]+XUSD$',
-    'USDT':         r'^(?![A-Z]+[0-9]+[LS]USDT$)[A-Z0-9]+USDT$',
+    'OTHER':        r'^[A-Z0-9]+(?:DAI|RLUSD|USDE|USDQ|USDR|USD1|XUSD)$',
+    'USDT':         r'^(?![A-Z]+\d[LS]USDT$)[A-Z0-9]+USDT$',
 }
 
 HEADERS = {
@@ -505,9 +499,7 @@ def build_parser() -> argparse.ArgumentParser:
         epilog="""Examples:
 python bybit_spot_orderbook.py --usdt
 python bybit_spot_orderbook.py --usdc
-python bybit_spot_orderbook.py --dai
-python bybit_spot_orderbook.py --rlusd
-python bybit_spot_orderbook.py --usde
+python bybit_spot_orderbook.py --other
 python bybit_spot_orderbook.py --crypto --workers 1
 python bybit_spot_orderbook.py --symbols ETHUSDT SOLUSDT
 python bybit_spot_orderbook.py --group FIAT
@@ -524,36 +516,12 @@ No arguments (Spyder): uses SPECIFIC_SYMBOLS or DEFAULT_GROUP from script config
         help="All USDC spot pairs",
     )
     group.add_argument(
+        "--other", action="store_true",
+        help="Other stablecoins (DAI, RLUSD, USDE, USDQ, USDR, USD1, XUSD)",
+    )
+    group.add_argument(
         "--fiat", action="store_true",
         help="Fiat pairs (EUR, GBP, BRL, TRY, AED, KZT, PLN, IDR, BRZ)",
-    )
-    group.add_argument(
-        "--dai", action="store_true",
-        help="DAI-quoted pairs",
-    )
-    group.add_argument(
-        "--rlusd", action="store_true",
-        help="RLUSD-quoted pairs",
-    )
-    group.add_argument(
-        "--usde", action="store_true",
-        help="USDE-quoted pairs",
-    )
-    group.add_argument(
-        "--usdq", action="store_true",
-        help="USDQ-quoted pairs",
-    )
-    group.add_argument(
-        "--usdr", action="store_true",
-        help="USDR-quoted pairs",
-    )
-    group.add_argument(
-        "--usd1", action="store_true",
-        help="USD1-quoted pairs",
-    )
-    group.add_argument(
-        "--xusd", action="store_true",
-        help="XUSD-quoted pairs",
     )
     group.add_argument(
         "--crypto", action="store_true",
@@ -585,13 +553,7 @@ No arguments (Spyder): uses SPECIFIC_SYMBOLS or DEFAULT_GROUP from script config
 _FLAG_TO_GROUP = {
     'usdt': 'USDT',
     'usdc': 'USDC',
-    'dai': 'DAI',
-    'rlusd': 'RLUSD',
-    'usde': 'USDE',
-    'usdq': 'USDQ',
-    'usdr': 'USDR',
-    'usd1': 'USD1',
-    'xusd': 'XUSD',
+    'other': 'OTHER',
     'fiat': 'FIAT',
     'crypto': 'CRYPTO',
     'leveraged': 'LEVERAGED',
