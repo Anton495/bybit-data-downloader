@@ -222,11 +222,11 @@ Each script defines groups of symbols matched by regex. Shorthand CLI flags are 
 | Group | Shorthand | Description | Example symbols |
 |---|---|---|---|
 | `USDT` | `--usdt` | USDT perpetual futures | ETHUSDT, BTCUSDT, SOLUSDT |
+| `INVERSE` | `--inverse` | Inverse (crypto-margined) | BTCUSD, ETHUSD, SOLUSD |
 | `PERP` | `--perp` | PERP contracts | BTCPERP, 1000PEPEPERP |
 | `STABLE` | `--stable` | Stablecoin pairs | USDCUSDT, FDUSDUSDT, BUSDUSDT |
-| `FUTURES` | `--futures` | Delivery futures | BTC-28FEB26, ETH-01MAR24 |
 | `QUARTERLY` | `--quarterly` | Quarterly futures | BTCUSDH26, ETHUSDM25 |
-| `INVERSE` | `--inverse` | Inverse (crypto-margined) | BTCUSD, ETHUSD, SOLUSD |
+| `FUTURES` | `--futures` | Delivery futures | BTC-28FEB26, ETH-01MAR24 |
 | `USDT_FUTURES` | `--usdt-futures` | USDT delivery futures | BTCUSDT-01AUG25, ETHUSDT-02JAN26 |
 
 > The USDT_FUTURES group is missing from futures trades.
