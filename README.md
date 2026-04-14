@@ -217,18 +217,7 @@ No `--all` flag — use `--group <NAME>` to select a symbol group (see [Symbol g
 
 Each script defines groups of symbols matched by regex. Shorthand CLI flags are provided for each group. Symbol lists are fetched from the server and filtered at runtime.
 
-### Futures trades — FUTURES_TRADES_GROUPS
-
-| Group | Shorthand | Description | Example symbols |
-|---|---|---|---|
-| `USDT` | `--usdt` | USDT perpetual futures | ETHUSDT, BTCUSDT, SOLUSDT |
-| `PERP` | `--perp` | PERP contracts | BTCPERP, 1000PEPEPERP |
-| `STABLE` | `--stable` | Stablecoin pairs | USDCUSDT, FDUSDUSDT, BUSDUSDT |
-| `FUTURES` | `--futures` | Delivery futures | BTC-28FEB26, ETH-01MAR24 |
-| `QUARTERLY` | `--quarterly` | Quarterly futures | BTCUSDH26, ETHUSDM25 |
-| `INVERSE` | `--inverse` | Inverse (crypto-margined) | BTCUSD, ETHUSD, XRPUSD |
-
-### Futures orderbook — FUTURES_ORDERBOOK_GROUPS
+### Futures trades and orderbook
 
 | Group | Shorthand | Description | Example symbols |
 |---|---|---|---|
@@ -240,24 +229,15 @@ Each script defines groups of symbols matched by regex. Shorthand CLI flags are 
 | `INVERSE` | `--inverse` | Inverse (crypto-margined) | BTCUSD, ETHUSD, SOLUSD |
 | `USDT_FUTURES` | `--usdt-futures` | USDT delivery futures | BTCUSDT-01AUG25, ETHUSDT-02JAN26 |
 
-### Spot trades — SPOT_TRADES_GROUPS
+> The USDT_FUTURES group is missing from futures trades.
+
+### Spot trades and orderbook groups
 
 | Group | Shorthand | Description | Example symbols |
 |---|---|---|---|
 | `USDT` | `--usdt` | USDT spot pairs | ETHUSDT, BTCUSDT, SOLUSDT |
 | `USDC` | `--usdc` | USDC spot pairs | ETHUSDC, BTCUSDC, SOLUSDC |
 | `CRYPTO` | `--crypto` | Crypto-quoted pairs | ETHBTC, SOLBNB, MNTETH |
-| `FIAT` | `--fiat` | Fiat pairs | BTCEUR, ETHBRL, SOLGBP |
-| `LEVERAGED` | `--leveraged` | Leveraged tokens | BTC3LUSDT, ETH3SUSDT, ADA2LUSDT |
-| `OTHER` | `--other` | Other stablecoins (DAI, RLUSD, USDE, etc.) | BTCDAI, ETHRLUSD, BTCUSDE, BTCUSDQ |
-
-### Spot orderbook — SPOT_ORDERBOOK_GROUPS
-
-| Group | Shorthand | Description | Example symbols |
-|---|---|---|---|
-| `USDT` | `--usdt` | USDT spot pairs | ETHUSDT, BTCUSDT, SOLUSDT |
-| `USDC` | `--usdc` | USDC spot pairs | ETHUSDC, BTCUSDC, SOLUSDC |
-| `CRYPTO` | `--crypto` | Crypto-quoted pairs | ETHBTC, SOLBNB, DOTETH |
 | `FIAT` | `--fiat` | Fiat pairs | BTCEUR, ETHBRL, SOLGBP |
 | `LEVERAGED` | `--leveraged` | Leveraged tokens | BTC3LUSDT, ETH3SUSDT, ADA2LUSDT |
 | `OTHER` | `--other` | Other stablecoins (DAI, RLUSD, USDE, etc.) | BTCDAI, ETHRLUSD, BTCUSDE, BTCUSDQ |
