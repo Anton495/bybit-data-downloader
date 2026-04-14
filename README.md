@@ -215,7 +215,7 @@ No `--all` flag — use `--group <NAME>` to select a symbol group (see [Symbol g
 
 ## Symbol groups
 
-Each script defines groups of symbols matched by regex. Shorthand CLI flags are provided for each group. Symbol lists are fetched from the server and filtered at runtime.
+Each script defines groups of symbols matched by regex. Shorthand CLI flags are provided for each group. Groups are mutually exclusive — each symbol matches at most one group. Symbol lists are fetched from the server at runtime and filtered by group regex.
 
 ### Futures trades and orderbook
 
@@ -241,8 +241,6 @@ Each script defines groups of symbols matched by regex. Shorthand CLI flags are 
 | `FIAT` | `--fiat` | Fiat pairs | BTCEUR, ETHBRL, SOLGBP |
 | `LEVERAGED` | `--leveraged` | Leveraged tokens | BTC3LUSDT, ETH3SUSDT, ADA2LUSDT |
 | `OTHER` | `--other` | Other stablecoins (DAI, RLUSD, USDE, etc.) | BTCDAI, ETHRLUSD, BTCUSDE, BTCUSDQ |
-
-Groups are mutually exclusive — each symbol matches at most one group. Symbol lists are fetched from the server at runtime and filtered by group regex.
 
 ### Verification — bybit_verify_groups.py
 
