@@ -36,6 +36,8 @@ import polars as pl
 import requests
 from tqdm import tqdm
 
+from bybit_verify_groups import stablecoins
+
 # =============================================================================
 # Configuration
 # =============================================================================
@@ -50,11 +52,11 @@ SPECIFIC_SYMBOLS: Optional[List[str]] = None  # None = use DEFAULT_GROUP; ["ETHU
 # Possible values: 'USDT', 'STABLE', 'FUTURES', 'QUARTERLY', 'PERP', 'INVERSE'
 DEFAULT_GROUP: Optional[str] = "USDT"
 DOWNLOAD_TIMEOUT = 120          # read timeout per file (seconds)
-CONNECT_TIMEOUT = 15            # connect timeout (seconds)
+CONNECT_TIMEOUT = 15           # connect timeout (seconds)
 MAX_RETRIES = 3
 RETRY_DELAY = 5
-CONCURRENT_WORKERS = 3          # parallel threads (each: download + convert)
-SYMBOL_DELAY = 2.0              # seconds to pause between symbols (rate-limit mitigation)
+CONCURRENT_WORKERS = 3        # parallel threads (each: download + convert)
+SYMBOL_DELAY = 2.0             # seconds to pause between symbols (rate-limit mitigation)
 
 # Parquet write settings
 PARQUET_COMPRESSION = "zstd"
@@ -64,12 +66,13 @@ PARQUET_ROW_GROUP_SIZE = 500_000
 # Symbol group filters — regex patterns for matching futures symbols on the server.
 # Used by CLI --group flags and by DEFAULT_GROUP in Spyder mode.
 FUTURES_TRADES_GROUPS = {
-    'STABLE': r'^(USDC|FDUSD|BUSD|USDE|UST|USTC)USDT$',
-    'FUTURES':      r'^(BTC|ETH|SOL|XRP)-\d{2}[A-Z]{3}\d{2}$',
-    'QUARTERLY': r'^(BTC|ETH)USD[FHJKMNQUVXZ]\d{2}$',
-    'PERP': r'^[A-Z0-9]+PERP$',
-    'INVERSE': r'^[A-Z]+USD$',
-    'USDT': r'^(?!(USDC|FDUSD|BUSD|USDE|UST|USTC)USDT$)[A-Z0-9]+USDT$',
+    'USDT':      rf'^(?!({"|".join(stablecoins)})USDT$)[A-Z0-9]+USDT$',
+    'INVERSE':   r'^[A-Z0-9]+USD$',
+    'PERP':      r'^[A-Z0-9]+PERP$',
+    'STABLE':    rf'^({"|".join(stablecoins)})USDT$',
+    'QUARTERLY': r'^[A-Z0-9]+USD[FHJKMNQUVXZ]\d{2}$',
+    'FUTURES':   r'^(?!.*USDT)[A-Z0-9]+-\d{2}[A-Z]{3}\d{2}$',
+    'UNSORTED':  r'.*',
 }
 
 HEADERS = {
@@ -432,7 +435,7 @@ def download_symbol(symbol: str, workers: int = CONCURRENT_WORKERS, timeout: int
 # =============================================================================
 # CLI and entry point
 # =============================================================================
-_GROUP_CHOICES = list(FUTURES_TRADES_GROUPS.keys())
+_GROUP_CHOICES = [k for k in FUTURES_TRADES_GROUPS if k != 'UNSORTED']
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -454,7 +457,7 @@ No arguments (Spyder): uses SPECIFIC_SYMBOLS or DEFAULT_GROUP from script config
     )
     group.add_argument(
         "--stable", action="store_true",
-        help="Stablecoin pairs (USDC, FDUSD, BUSD, USDE, UST, USTC vs USDT)",
+        help="Stablecoin pairs (stablecoins vs USDT)",
     )
     group.add_argument(
         "--futures", action="store_true",

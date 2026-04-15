@@ -76,11 +76,13 @@ bybit_futures_trades.py --symbols ETHUSDT SOLUSDT      # specific symbols
 
 ```bash
 bybit_spot_trades.py --usdt                           # all USDT spot pairs
+bybit_spot_trades.py --stable                         # stablecoin pairs (stablecoins vs USDT)
 bybit_spot_trades.py --usdc                           # all USDC spot pairs
-bybit_spot_trades.py --crypto                         # crypto-quoted pairs (BTC, ETH, SOL, etc.)
+bybit_spot_trades.py --inverse                        # USD-quoted pairs (BTCUSD, ETHUSD, etc.)
+bybit_spot_trades.py --other                          # other stablecoins (DAI, RLUSD, USDE, etc.)
+bybit_spot_trades.py --crypto                         # crypto-quoted pairs (ETHBTC, SOLBNB, etc.)
 bybit_spot_trades.py --fiat                           # fiat pairs (EUR, GBP, BRL, etc.)
 bybit_spot_trades.py --leveraged                      # leveraged tokens (BTC3L, ETH3S, etc.)
-bybit_spot_trades.py --other                          # other stablecoins (DAI, RLUSD, USDE, etc.)
 bybit_spot_trades.py --group FIAT --workers 5         # group name + options
 bybit_spot_trades.py --symbols ETHUSDT SOLUSDT        # specific symbols
 ```
@@ -154,11 +156,13 @@ bybit_futures_orderbook.py --symbols ETHUSDT SOLUSDT      # specific symbols
 
 ```bash
 bybit_spot_orderbook.py --usdt                          # all USDT spot pairs
+bybit_spot_orderbook.py --stable                        # stablecoin pairs (stablecoins vs USDT)
 bybit_spot_orderbook.py --usdc                          # all USDC spot pairs
-bybit_spot_orderbook.py --crypto                        # crypto-quoted pairs (BTC, ETH, SOL, etc.)
+bybit_spot_orderbook.py --inverse                       # USD-quoted pairs (BTCUSD, ETHUSD, etc.)
+bybit_spot_orderbook.py --other                         # other stablecoins (DAI, RLUSD, USDE, etc.)
+bybit_spot_orderbook.py --crypto                        # crypto-quoted pairs (ETHBTC, SOLBNB, etc.)
 bybit_spot_orderbook.py --fiat                          # fiat pairs (EUR, GBP, BRL, etc.)
 bybit_spot_orderbook.py --leveraged                     # leveraged tokens (BTC3L, ETH3S, etc.)
-bybit_spot_orderbook.py --other                         # other stablecoins (DAI, RLUSD, USDE, etc.)
 bybit_spot_orderbook.py --group USDC --workers 1        # group name + options
 bybit_spot_orderbook.py --symbols ETHUSDT SOLUSDT       # specific symbols
 ```
@@ -217,6 +221,8 @@ No `--all` flag — use `--group <NAME>` to select a symbol group (see [Symbol g
 
 Each script defines groups of symbols matched by regex. Shorthand CLI flags are provided for each group. Groups are mutually exclusive — each symbol matches at most one group. Symbol lists are fetched from the server at runtime and filtered by group regex.
 
+The stablecoins and fiatcoins classification sets are defined in bybit_verify_groups.py and imported by all 4 downloader scripts. Adding a new stablecoin or fiat currency requires updating only the set in bybit_verify_groups.py.
+
 ### Futures trades and orderbook
 
 | Group | Shorthand | Description | Example symbols |
@@ -237,8 +243,10 @@ Each script defines groups of symbols matched by regex. Shorthand CLI flags are 
 |---|---|---|---|
 | `USDT` | `--usdt` | USDT spot pairs | ETHUSDT, BTCUSDT, SOLUSDT |
 | `USDC` | `--usdc` | USDC spot pairs | ETHUSDC, BTCUSDC, SOLUSDC |
+| `INVERSE` | `--inverse` | USD-quoted pairs (crypto vs USD) | BTCUSD, ETHUSD, SOLUSD |
 | `CRYPTO` | `--crypto` | Crypto-quoted pairs | ETHBTC, SOLBNB, MNTETH |
 | `FIAT` | `--fiat` | Fiat pairs | BTCEUR, ETHBRL, SOLGBP |
+| `STABLE` | `--stable` | Stablecoin pairs (stablecoins vs USDT) | USDCUSDT, FDUSDUSDT, TUSDUSDT |
 | `LEVERAGED` | `--leveraged` | Leveraged tokens | BTC3LUSDT, ETH3SUSDT, ADA2LUSDT |
 | `OTHER` | `--other` | Other stablecoins (DAI, RLUSD, USDE, etc.) | BTCDAI, ETHRLUSD, BTCUSDE, BTCUSDQ |
 
@@ -269,9 +277,7 @@ ALL_SYMBOLS = {
 }
 ```
 
-> **Important: check classification accuracy regularly.** New groups are not added in real-time. If Bybit adds a new fiat currency or a new stablecoin, pairs like `BTC{NEW_FIAT}` or `ETH{NEW_STABLE}` may fall into the CRYPTO group until the classification is updated. Similarly, `{NEW_STABLE}USDT` pairs (e.g. `TUSDUSDT`, `FDUSDUSDT`) may fall into the USDT group. Run `bybit_verify_groups.py` periodically and check for unmatched symbols or unexpected symbols in CRYPTO and USDT.
->
-> In the future, the project is planned to migrate from static regex-based group definitions to dynamic group formation based on server data, which will improve reliability.
+> **Important: check classification accuracy regularly.** New groups are not added in real-time.
 
 
 ---

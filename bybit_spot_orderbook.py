@@ -53,6 +53,8 @@ import polars as pl
 import requests
 from tqdm import tqdm
 
+from bybit_verify_groups import stablecoins, fiatcoins
+
 # =============================================================================
 # Configuration
 # =============================================================================
@@ -64,7 +66,7 @@ OUTPUT_DIR = "bybit_data/spot/orderbook"
 SPECIFIC_SYMBOLS: Optional[List[str]] = None  # None = use DEFAULT_GROUP; ["ETHUSDT"] = specific
 # Default group for Spyder / Jupyter mode (when SPECIFIC_SYMBOLS is None).
 # Set to None to disable auto-fetch (must use --group on CLI).
-# Possible values: 'USDT', 'USDC', 'OTHER', 'FIAT', 'CRYPTO', 'LEVERAGED'
+# Possible values: 'USDT', 'STABLE', 'USDC', 'OTHER', 'FIAT', 'CRYPTO', 'LEVERAGED'
 DEFAULT_GROUP: Optional[str] = "USDT"
 PROXY_URL = False  # e.g. "http://127.0.0.1:2080" or False to disable
 DOWNLOAD_TIMEOUT = 600          # seconds (files are large, up to ~300 MB)
@@ -83,12 +85,15 @@ PARQUET_ROW_GROUP_SIZE = 500_000
 # Used by CLI --group flags and by DEFAULT_GROUP in Spyder mode.
 # Patterns are mutually exclusive (no overlaps).
 SPOT_ORDERBOOK_GROUPS = {
-    'LEVERAGED':    r'^[A-Z]+\d[LS]USDT$',
-    'FIAT':         r'^[A-Z0-9]+(?:EUR|GBP|BRL|TRY|AED|KZT|PLN|IDR|BRZ)$',
-    'CRYPTO':       r'^[A-Z0-9]+(?:BTC|ETH|SOL|MNT)$',
-    'USDC':         r'^[A-Z0-9]+USDC$',
-    'OTHER':        r'^[A-Z0-9]+(?:DAI|RLUSD|USDE|USDQ|USDR|USD1|XUSD)$',
-    'USDT':         r'^(?![A-Z]+\d[LS]USDT$)[A-Z0-9]+USDT$',
+    'LEVERAGED': r'^[A-Z0-9]+\d[LS]USDT$',
+    'STABLE':    rf'^({"|".join(stablecoins)})USDT$',
+    'USDT':      r'^[A-Z0-9]+USDT$',
+    'FIAT':      rf'^[A-Z0-9]+({"|".join(fiatcoins)})$',
+    'USDC':      r'^[A-Z0-9]+USDC$',
+    'INVERSE':   None,
+    'OTHER':     rf'^[A-Z0-9]+({"|".join(stablecoins)})$',
+    'CRYPTO':    None,
+    'UNSORTED':  r'.*',
 }
 
 HEADERS = {
@@ -167,8 +172,26 @@ def get_all_symbols() -> List[str]:
     resp.raise_for_status()
     return parse_directory_links(resp.text)
 
+def _compute_basecoins(all_symbols: List[str]) -> set:
+    """Extracts base currencies from USDT pairs, excluding stablecoins."""
+    usdt_pat = SPOT_ORDERBOOK_GROUPS['USDT']
+    return {sym[:-4] for sym in all_symbols
+            if sym.endswith('USDT') and re.match(usdt_pat, sym)
+            and sym[:-4] not in stablecoins}
+
 def filter_by_group(all_symbols: List[str], group: str) -> List[str]:
     """Filters symbols by group name using SPOT_ORDERBOOK_GROUPS regex."""
+    basecoins = _compute_basecoins(all_symbols)
+    if group == 'INVERSE':
+        if not basecoins:
+            return []
+        pattern = rf'^({"|".join(basecoins)})USD$'
+        return sorted([s for s in all_symbols if re.match(pattern, s)])
+    if group == 'CRYPTO':
+        if not basecoins:
+            return []
+        pattern = rf'^({"|".join(basecoins)})+({"|".join(basecoins)})$'
+        return sorted([s for s in all_symbols if re.match(pattern, s)])
     pattern = SPOT_ORDERBOOK_GROUPS.get(group)
     if pattern is None:
         raise ValueError(f"Unknown group: {group}. Available: {', '.join(SPOT_ORDERBOOK_GROUPS)}")
@@ -490,7 +513,7 @@ def download_symbol(symbol: str, workers: int = CONCURRENT_WORKERS, timeout: int
 # =============================================================================
 # CLI and entry point
 # =============================================================================
-_GROUP_CHOICES = list(SPOT_ORDERBOOK_GROUPS.keys())
+_GROUP_CHOICES = [k for k in SPOT_ORDERBOOK_GROUPS if k != 'UNSORTED']
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -516,6 +539,10 @@ No arguments (Spyder): uses SPECIFIC_SYMBOLS or DEFAULT_GROUP from script config
         help="All USDC spot pairs",
     )
     group.add_argument(
+        "--stable", action="store_true",
+        help="Stablecoin pairs (stablecoins vs USDT)",
+    )
+    group.add_argument(
         "--other", action="store_true",
         help="Other stablecoins (DAI, RLUSD, USDE, USDQ, USDR, USD1, XUSD)",
     )
@@ -526,6 +553,10 @@ No arguments (Spyder): uses SPECIFIC_SYMBOLS or DEFAULT_GROUP from script config
     group.add_argument(
         "--crypto", action="store_true",
         help="Crypto-quoted pairs (BTC, ETH, SOL, MNT)",
+    )
+    group.add_argument(
+        "--inverse", action="store_true",
+        help="Inverse pairs (coinUSD)",
     )
     group.add_argument(
         "--leveraged", action="store_true",
@@ -552,10 +583,12 @@ No arguments (Spyder): uses SPECIFIC_SYMBOLS or DEFAULT_GROUP from script config
 # Map CLI flag attribute names → group names
 _FLAG_TO_GROUP = {
     'usdt': 'USDT',
+    'stable': 'STABLE',
     'usdc': 'USDC',
     'other': 'OTHER',
     'fiat': 'FIAT',
     'crypto': 'CRYPTO',
+    'inverse': 'INVERSE',
     'leveraged': 'LEVERAGED',
 }
 

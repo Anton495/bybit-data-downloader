@@ -19,19 +19,28 @@ Usage:
   python bybit_verify_groups.py --trades     # futures_trades + spot_trades
   python bybit_verify_groups.py --orderbook  # futures_orderbook + spot_orderbook
   python bybit_verify_groups.py --full       # print all symbols per group
-  python bybit_verify_groups.py --stable     # show STABLE group across all scripts
-  python bybit_verify_groups.py --usdc       # show USDC group across all scripts
-  python bybit_verify_groups.py --dai        # show DAI group across all scripts
-  python bybit_verify_groups.py --usde       # show USDE group across all scripts
+  python bybit_verify_groups.py --group STABLE     # show STABLE group across all scripts
+  python bybit_verify_groups.py --group USDC       # show USDC group across all scripts
+  python bybit_verify_groups.py --group OTHER      # show OTHER group across all scripts
+  python bybit_verify_groups.py --group UNSORTED   # show UNSORTED group across all scripts
 """
 import argparse
-import ast
 import os
 import re
 from collections import OrderedDict
 from typing import Dict, List, Tuple
 
 import requests
+
+# =============================================================================
+# Shared classification sets — imported by the 4 downloader scripts
+# =============================================================================
+stablecoins = {'BUSD', 'FDUSD', 'USDQ', 'USDR', 'DAI', 'RLUSD', 'USD1', 'USDC', 'USDE',
+               'USDT', 'USTC', 'UST', 'XUSD', 'USDD', 'TUSD', 'FRAX', 'CUSD', 'PYUSD',
+               'USDY', 'USDTB', 'MUSD', 'STABLE', 'BRZ'}
+
+fiatcoins = {'IDR', 'KZT', 'AED', 'BRL', 'EUR', 'GBP', 'PLN', 'TRY', 'EGP1'}
+
 
 # =============================================================================
 # Script paths — relative to this file
@@ -115,7 +124,10 @@ def _extract_groups(filepath: str, var_name: str) -> Dict[str, str]:
         elif text[i] == "}":
             depth -= 1
             if depth == 0:
-                return ast.literal_eval(text[start:i + 1])
+                return eval(text[start:i + 1],
+                             {"__builtins__": {},
+                              "stablecoins": stablecoins,
+                              "fiatcoins": fiatcoins})
     raise ValueError(f"Could not find closing brace for '{var_name}'")
 
 
@@ -141,6 +153,23 @@ def run(selected: List[str]) -> None:
         resp = requests.get(cfg["url"], timeout=30)
         resp.raise_for_status()
         symbols = parse_fn(resp.text)
+
+        # Dynamically compute INVERSE and CRYPTO patterns from USDT pairs
+        usdt_pat = groups.get('USDT')
+        if usdt_pat:
+            basecoins = {sym[:-4] for sym in symbols
+                         if re.match(usdt_pat, sym) and sym.endswith('USDT')
+                         and sym[:-4] not in stablecoins}
+            if 'INVERSE' in groups and groups['INVERSE'] is None:
+                if basecoins:
+                    groups['INVERSE'] = rf'^({"|".join(basecoins)})USD$'
+                else:
+                    groups['INVERSE'] = r'(?!.*)'
+            if 'CRYPTO' in groups and groups['CRYPTO'] is None:
+                if basecoins:
+                    groups['CRYPTO'] = rf'^({"|".join(basecoins)})+({"|".join(basecoins)})$'
+                else:
+                    groups['CRYPTO'] = r'(?!.*)'
 
         # Classify: first match wins
         classified: Dict[str, List[str]] = {g: [] for g in groups}
@@ -279,7 +308,7 @@ def main():
     parser.add_argument("--full", action="store_true",
                         help="print all symbols per group")
     parser.add_argument("--group", metavar="NAME",
-                        help="show only this group (e.g. USDT, USDC, DAI, RLUSD, USDE, USDQ, USDR, USD1, XUSD, CRYPTO, FIAT)")
+                        help="show only this group (e.g. USDT, USDC, STABLE, OTHER, CRYPTO, FIAT, LEVERAGED, UNSORTED)")
     args = parser.parse_args()
 
     if args.trades and args.orderbook:

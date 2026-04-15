@@ -53,6 +53,8 @@ import polars as pl
 import requests
 from tqdm import tqdm
 
+from bybit_verify_groups import stablecoins
+
 # =============================================================================
 # Configuration
 # =============================================================================
@@ -82,13 +84,14 @@ PARQUET_ROW_GROUP_SIZE = 500_000
 # Symbol group filters — regex patterns for matching futures symbols on the server.
 # Used by CLI --group flags and by DEFAULT_GROUP in Spyder mode.
 FUTURES_ORDERBOOK_GROUPS = {
-    'STABLE':     r'^(USDC|FDUSD|BUSD|USDE|USTC|UST)USDT$',
-    'FUTURES':       r'^(BTC|ETH|SOL|XRP)-\d{2}[A-Z]{3}\d{2}$',
+    'USDT':          rf'^(?!({"|".join(stablecoins)})USDT$)[A-Z0-9]+USDT$',
+    'INVERSE':       r'^[A-Z0-9]+USD$',
+    'PERP':          r'^[A-Z0-9]+PERP$',
+    'STABLE':        rf'^({"|".join(stablecoins)})USDT$',
+    'QUARTERLY':     r'^[A-Z0-9]+USD[FHJKMNQUVXZ]\d{2}$',
+    'FUTURES':       r'^(?!.*USDT)[A-Z0-9]+-\d{2}[A-Z]{3}\d{2}$',
     'USDT_FUTURES':  r'^[A-Z0-9]+USDT-\d{2}[A-Z]{3}\d{2}$',
-    'PERP':       r'^[A-Z0-9]+PERP$',
-    'QUARTERLY':  r'^(BTC|ETH)USD[FHJKMNQUVXZ]\d{2}$',
-    'INVERSE':    r'^[A-Z]+USD$',
-    'USDT':       r'^(?!(USDC|FDUSD|BUSD|USDE|USTC|UST)USDT$)[A-Z0-9]+USDT$',
+    'UNSORTED':      r'.*',
 }
 
 # Per-group server path overrides (default: TRADING_PATH = /orderbook/linear/)
@@ -463,8 +466,10 @@ def download_symbol(symbol: str, workers: int = CONCURRENT_WORKERS, timeout: int
     failed, success_files = [], []
     manifest_lock = threading.Lock()
 
+    effective_tp = trading_path or TRADING_PATH
+
     def task(fn):
-        url = f"{BASE_URL}{TRADING_PATH}{symbol}/{fn}"
+        url = f"{BASE_URL}{effective_tp}{symbol}/{fn}"
         parquet_name = fn.replace(".data.zip", ".parquet")
         parquet_path = os.path.join(symbol_dir, parquet_name)
         success, actual_size = download_and_convert(url, parquet_path, timeout=timeout)
@@ -498,7 +503,7 @@ def download_symbol(symbol: str, workers: int = CONCURRENT_WORKERS, timeout: int
 # =============================================================================
 # CLI and entry point
 # =============================================================================
-_GROUP_CHOICES = list(FUTURES_ORDERBOOK_GROUPS.keys())
+_GROUP_CHOICES = [k for k in FUTURES_ORDERBOOK_GROUPS if k != 'UNSORTED']
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -521,7 +526,7 @@ No arguments (Spyder): uses SPECIFIC_SYMBOLS or DEFAULT_GROUP from script config
     )
     group.add_argument(
         "--stable", action="store_true",
-        help="Stablecoin pairs (USDC, FDUSD, BUSD, USDE, USTC, UST vs USDT)",
+        help="Stablecoin pairs (stablecoins vs USDT)",
     )
     group.add_argument(
         "--perp", action="store_true",
