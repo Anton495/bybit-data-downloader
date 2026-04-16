@@ -221,9 +221,9 @@ No `--all` flag — use `--group <NAME>` to select a symbol group (see [Symbol g
 
 Each script defines groups of symbols matched by regex. Shorthand CLI flags are provided for each group. Groups are mutually exclusive — each symbol matches at most one group. Symbol lists are fetched from the server at runtime and filtered by group regex.
 
-The stablecoins and fiatcoins classification sets are defined in bybit_verify_groups.py and imported by all 4 downloader scripts. Adding a new stablecoin or fiat currency requires updating only the set in bybit_verify_groups.py.
-
 > **Important: check classification accuracy regularly.** New groups are not added in real-time.
+>
+> The stablecoins and fiatcoins classification sets are defined in bybit_verify_groups.py and imported by all 4 downloader scripts. Adding a new stablecoin or fiat currency requires updating only the set in bybit_verify_groups.py.
 
 ### Futures trades and orderbook
 
