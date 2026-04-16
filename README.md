@@ -223,6 +223,8 @@ Each script defines groups of symbols matched by regex. Shorthand CLI flags are 
 
 The stablecoins and fiatcoins classification sets are defined in bybit_verify_groups.py and imported by all 4 downloader scripts. Adding a new stablecoin or fiat currency requires updating only the set in bybit_verify_groups.py.
 
+> **Important: check classification accuracy regularly.** New groups are not added in real-time.
+
 ### Futures trades and orderbook
 
 | Group | Shorthand | Description | Example symbols |
@@ -276,9 +278,6 @@ ALL_SYMBOLS = {
     "spot_orderbook":    {"symbols": [...], "groups": {"USDT": [...], ...}, ...},
 }
 ```
-
-> **Important: check classification accuracy regularly.** New groups are not added in real-time.
-
 
 ---
 
